@@ -1,0 +1,6 @@
+[package]
+name = "rddns"
+version = "0.1.0"
+authors = ["Raik Bieniek <dev@voidnode.de>"]
+
+[dependencies]
