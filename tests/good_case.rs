@@ -23,5 +23,5 @@ fn writes_prints_to_console_on_request() {
     });
     core.run(work).unwrap();
 
-    assert_eq!(rddns.stdout_readln(), "would update now\n");
+    assert_eq!(rddns.stdout_readln(), "updating DDNS entries\n");
 }
