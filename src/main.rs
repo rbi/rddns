@@ -1,5 +1,6 @@
 extern crate tokio_core;
 extern crate hyper;
+extern crate hyper_tls;
 extern crate futures;
 
 mod server;

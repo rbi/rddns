@@ -1,6 +1,8 @@
 use tokio_core::reactor::Core;
-use hyper::{Client, Request, Method};
+use hyper::{Body, Client, Request, Method};
+use hyper::client::HttpConnector;
 use hyper::header::{Authorization, Basic};
+use hyper_tls::HttpsConnector;
 
 pub struct DdnsEntry {
     pub url: String,
@@ -10,13 +12,16 @@ pub struct DdnsEntry {
 
 pub struct DdnsUpdater {
     core: Core,
-    client: Client<::hyper::client::HttpConnector, ::hyper::Body>,
+    client: Client<HttpsConnector<HttpConnector>, Body>,
 }
 
 impl DdnsUpdater {
     pub fn new() -> DdnsUpdater {
         let core = Core::new().unwrap();
-        let client = Client::new(&core.handle());
+        let handle = core.handle();
+        let client = Client::configure()
+            .connector(HttpsConnector::new(4, &handle).unwrap())
+            .build(&handle);
         DdnsUpdater {
             core,
             client,
