@@ -8,3 +8,9 @@ hyper = "0.11.2"
 hyper-tls = "0.1.2"
 futures = "0.1.17"
 tokio-core = "0.1.11"
+toml = "0.4.5"
+serde = "1.0.27"
+serde_derive = "1.0.27"
+
+[dev-dependencies]
+tempdir = "0.3.5"

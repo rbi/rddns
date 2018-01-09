@@ -4,11 +4,7 @@ use hyper::client::HttpConnector;
 use hyper::header::{Authorization, Basic};
 use hyper_tls::HttpsConnector;
 
-pub struct DdnsEntry {
-    pub url: String,
-    pub username: String,
-    pub password: String,
-}
+use config::DdnsEntry;
 
 pub struct DdnsUpdater {
     core: Core,
