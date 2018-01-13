@@ -2,31 +2,68 @@ use futures;
 use futures::future::Future;
 use hyper;
 use hyper::StatusCode;
-use hyper::server::{Http, Request, Response, Service};
+use hyper::server::{Http, Request, Response, Service, NewService};
 
-pub struct Server;
+pub struct Server<T: Clone + 'static> {
+    update_callback: fn(&T) -> Result<(), String>,
+    user_data: T,
+}
 
-impl Server {
-    pub fn start_server(&self, update_callback: fn() -> Result<(), String>) {
+impl<T: Clone + 'static> Server<T> {
+    pub fn new(update_callback: fn(&T) -> Result<(), String>, user_data: T) -> Server<T> {
+        Server {
+            update_callback,
+            user_data,
+        }
+    }
+
+    pub fn start_server(&self) {
         let addr = "[::]:3000".parse().unwrap();
-        let server = Http::new().bind(&addr, move || Ok(RequestHandler { update_callback })).unwrap();
-        println!("Listening on port 3000");
+        let service_creator: ServiceCreator<T> = ServiceCreator {
+            update_callback: self.update_callback,
+            user_data: self.user_data.clone()
+        };
+        let server = Http::new().bind(&addr, service_creator ).unwrap();
         server.run().unwrap();
+    }
+
+    pub fn http_port(&self) -> u16 {
+        3000
     }
 }
 
-struct RequestHandler {
-    update_callback: fn() -> Result<(), String>
+struct ServiceCreator<T> {
+    update_callback: fn(&T) -> Result<(), String>,
+    user_data: T,
 }
 
-impl Service for RequestHandler {
+impl<T: Clone> NewService for ServiceCreator<T> {
+    type Request = Request;
+    type Response = Response;
+    type Error = hyper::Error;
+    type Instance = RequestHandler<T>;
+
+    fn new_service(&self) -> ::std::io::Result<Self::Instance> {
+        Ok(RequestHandler {
+            update_callback: self.update_callback,
+            user_data: self.user_data.clone(),
+        })
+    }
+}
+
+struct RequestHandler<T> {
+    update_callback: fn(&T) -> Result<(), String>,
+    user_data: T,
+}
+
+impl<T> Service for RequestHandler<T> {
     type Request = Request;
     type Response = Response;
     type Error = hyper::Error;
     type Future = Box<Future<Item=Self::Response, Error=Self::Error>>;
 
     fn call(&self, _req: Request) -> Self::Future {
-        let update_result = (self.update_callback)();
+        let update_result = (self.update_callback)(&self.user_data);
         let return_code = match update_result {
             Ok(_) => StatusCode::Ok,
             Err(_) => StatusCode::BadGateway

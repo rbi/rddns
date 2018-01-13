@@ -1,18 +1,26 @@
 use std::path::Path;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Read};
+use std::fmt::{Display, Formatter};
 
-#[derive(PartialEq, Debug, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Deserialize)]
 pub struct Config {
     #[serde(default)]
     pub ddns_entries: Vec<DdnsEntry>
 }
 
-#[derive(PartialEq, Debug, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Deserialize)]
 pub struct DdnsEntry {
     pub url: String,
     pub username: String,
     pub password: String,
+}
+
+
+impl Display for DdnsEntry {
+    fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
+        write!(f, "{}", self.url)
+    }
 }
 
 pub fn read_config(config_file: &Path) -> Result<Config, Error> {

@@ -24,14 +24,14 @@ impl DdnsUpdater {
         }
     }
 
-    pub fn update_dns(& mut self, ddns_entry: DdnsEntry) -> Result<(), String> {
+    pub fn update_dns(& mut self, ddns_entry: &DdnsEntry) -> Result<(), String> {
         let uri = ddns_entry.url.parse().unwrap();
 
         let mut request = Request::new(Method::Get, uri);
         let auth = Authorization(
             Basic {
-                username: ddns_entry.username,
-                password: Some(ddns_entry.password),
+                username: ddns_entry.username.clone(),
+                password: Some(ddns_entry.password.clone()),
             }
         );
         request.headers_mut().set(auth);
