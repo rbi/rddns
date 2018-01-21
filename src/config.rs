@@ -6,7 +6,9 @@ use std::fmt::{Display, Formatter};
 #[derive(Clone, PartialEq, Debug, Deserialize)]
 pub struct Config {
     #[serde(default)]
-    pub ddns_entries: Vec<DdnsEntry>
+    pub ddns_entries: Vec<DdnsEntry>,
+    #[serde(default)]
+    pub ip_addresses: Vec<IpAddress>,
 }
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
@@ -16,11 +18,23 @@ pub struct DdnsEntry {
     pub password: String,
 }
 
-
 impl Display for DdnsEntry {
     fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
         write!(f, "{}", self.url)
     }
+}
+
+#[derive(Clone, PartialEq, Debug, Deserialize)]
+#[serde(tag = "type")]
+pub enum IpAddress {
+    #[serde(rename = "parameter")]
+    FromParameter {
+        parameter: String
+    },
+    #[serde(rename = "static")]
+    Static {
+        address: String
+    },
 }
 
 pub fn read_config(config_file: &Path) -> Result<Config, Error> {
@@ -43,6 +57,14 @@ mod tests {
     #[test]
     fn can_read_maximal_config_file() {
         let config_file_content = br#"
+        [[ip_addresses]]
+        type = "parameter"
+        parameter = "addr1"
+
+        [[ip_addresses]]
+        type = "static"
+        address = "2001:DB8:123:abcd::1"
+
         [[ddns_entries]]
         url = "http://example.com"
         username = "someUser"
@@ -57,6 +79,15 @@ mod tests {
         let (_temp_dir, config_file_path) = create_temp_file(config_file_content);
 
         let expected = Config {
+            ip_addresses: vec![
+                IpAddress::FromParameter {
+                    parameter: "addr1".to_string()
+                },
+                IpAddress::Static {
+                    address: "2001:DB8:123:abcd::1".to_string()
+                }
+            ],
+
             ddns_entries: vec![
                 DdnsEntry {
                     url: "http://example.com".to_string(),
@@ -83,7 +114,8 @@ mod tests {
         let (_temp_dir, config_file_path) = create_temp_file(config_file_content);
 
         let expected = Config {
-            ddns_entries: vec![]
+            ip_addresses: vec![],
+            ddns_entries: vec![],
         };
 
         let actual = read_config(&config_file_path)
