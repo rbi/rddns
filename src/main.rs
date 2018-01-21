@@ -13,6 +13,7 @@ mod config;
 
 use std::env;
 use std::path::PathBuf;
+use std::collections::HashMap;
 
 use config::Config;
 use updater::DdnsUpdater;
@@ -56,7 +57,7 @@ fn get_config_file() -> Result<PathBuf, ()> {
     Ok(path)
 }
 
-fn do_update(config: &Config) -> Result<(), String> {
+fn do_update(config: &Config, addresses: &HashMap<String, String>) -> Result<(), String> {
     println!("updating DDNS entries");
 
     let mut updater = DdnsUpdater::new();
