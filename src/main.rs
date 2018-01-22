@@ -6,6 +6,9 @@ extern crate futures;
 #[macro_use]
 extern crate serde_derive;
 extern crate toml;
+extern crate regex;
+#[macro_use]
+extern crate lazy_static;
 
 mod server;
 mod updater;

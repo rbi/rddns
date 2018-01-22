@@ -4,6 +4,7 @@ use futures::future::Future;
 use hyper;
 use hyper::StatusCode;
 use hyper::server::{Http, Request, Response, Service, NewService};
+use regex::Regex;
 
 pub struct Server<T: Clone + 'static> {
     update_callback: fn(&T, &HashMap<String, String>) -> Result<(), String>,
@@ -98,36 +99,18 @@ fn extract_address_parameters(query: &Option<&str>) -> HashMap<String, String> {
     map
 }
 
+
 fn to_address_param(param: &str) -> Option<(String, String)> {
-    let mut parts = param.split("=");
-    let key_opt = parts.next();
-    let value_opt = parts.next();
-
-    if key_opt.is_none() || value_opt.is_none() {
-        return None;
+    lazy_static! {
+        static ref IP_PARAM: Regex = Regex::new(r"ip\.([^=]+)=(.+)").unwrap();
     }
 
-    let key = key_opt.unwrap().to_string();
-
-    let mut key_parts = key.split(".");
-    let prefix_opt = key_parts.next();
-    let key_name_opt = key_parts.next();
-    if prefix_opt.is_none() || key_name_opt.is_none() {
-        return None;
-    }
-
-    let key_name = key_name_opt.unwrap();
-    if prefix_opt.unwrap() != "ip" || key_name.is_empty() {
-        return None;
-    }
-
-    Some((key_name.to_string(), value_opt.unwrap().to_string()))
+    IP_PARAM.captures(param).map(|groups| (groups[1].to_string(), groups[2].to_string()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
 
     #[test]
     fn extract_address_parameters_correctly() {
