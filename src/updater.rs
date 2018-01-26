@@ -4,7 +4,7 @@ use hyper::client::HttpConnector;
 use hyper::header::{Authorization, Basic};
 use hyper_tls::HttpsConnector;
 
-use config::DdnsEntry;
+use resolver::ResolvedDdnsEntry;
 
 pub struct DdnsUpdater {
     core: Core,
@@ -24,17 +24,19 @@ impl DdnsUpdater {
         }
     }
 
-    pub fn update_dns(& mut self, ddns_entry: &DdnsEntry) -> Result<(), String> {
+    pub fn update_dns(& mut self, ddns_entry: &ResolvedDdnsEntry) -> Result<(), String> {
         let uri = ddns_entry.url.parse().unwrap();
 
         let mut request = Request::new(Method::Get, uri);
-        let auth = Authorization(
-            Basic {
-                username: ddns_entry.username.clone(),
-                password: Some(ddns_entry.password.clone()),
-            }
-        );
-        request.headers_mut().set(auth);
+        ddns_entry.username.clone().map(|username| {
+            let auth = Authorization(
+                Basic {
+                    username: username,
+                    password: ddns_entry.password.clone(),
+                }
+            );
+            request.headers_mut().set(auth);
+        });
 
         let work = self.client.request(request);
         self.core.run(work)

@@ -2,20 +2,22 @@ use std::path::Path;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Read};
 use std::fmt::{Display, Formatter};
+use std::collections::HashMap;
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
 pub struct Config {
     #[serde(default)]
     pub ddns_entries: Vec<DdnsEntry>,
     #[serde(default)]
-    pub ip_addresses: Vec<IpAddress>,
+    #[serde(rename = "ip_address")]
+    pub ip_addresses: HashMap<String, IpAddress>,
 }
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
 pub struct DdnsEntry {
     pub url: String,
-    pub username: String,
-    pub password: String,
+    pub username: Option<String>,
+    pub password: Option<String>,
 }
 
 impl Display for DdnsEntry {
@@ -29,11 +31,11 @@ impl Display for DdnsEntry {
 pub enum IpAddress {
     #[serde(rename = "parameter")]
     FromParameter {
-        parameter: String
+        parameter: String,
     },
     #[serde(rename = "static")]
     Static {
-        address: String
+        address: String,
     },
 }
 
@@ -57,49 +59,46 @@ mod tests {
     #[test]
     fn can_read_maximal_config_file() {
         let config_file_content = br#"
-        [[ip_addresses]]
+        [ip_address.addr1]
         type = "parameter"
         parameter = "addr1"
 
-        [[ip_addresses]]
+        [ip_address.some_static_addr]
         type = "static"
         address = "2001:DB8:123:abcd::1"
 
         [[ddns_entries]]
-        url = "http://example.com"
+        url = "http://example.com/{addr1}"
         username = "someUser"
         password = "somePassword"
 
         [[ddns_entries]]
-        url = "https://other.org/x?y=z"
-        username = "other_user"
-        password = "other_password"
+        url = "https://other.org/x?y={some_static_addr}"
         "#;
 
         let (_temp_dir, config_file_path) = create_temp_file(config_file_content);
 
+        let mut ip_addresses = HashMap::new();
+        ip_addresses.insert("addr1".to_string(), IpAddress::FromParameter {
+            parameter: "addr1".to_string()
+        });
+        ip_addresses.insert("some_static_addr".to_string(), IpAddress::Static {
+            address: "2001:DB8:123:abcd::1".to_string(),
+        });
         let expected = Config {
-            ip_addresses: vec![
-                IpAddress::FromParameter {
-                    parameter: "addr1".to_string()
-                },
-                IpAddress::Static {
-                    address: "2001:DB8:123:abcd::1".to_string()
-                }
-            ],
-
+            ip_addresses,
             ddns_entries: vec![
                 DdnsEntry {
-                    url: "http://example.com".to_string(),
-                    username: "someUser".to_string(),
-                    password: "somePassword".to_string(),
+                    url: "http://example.com/{addr1}".to_string(),
+                    username: Some("someUser".to_string()),
+                    password: Some("somePassword".to_string()),
                 },
                 DdnsEntry {
-                    url: "https://other.org/x?y=z".to_string(),
-                    username: "other_user".to_string(),
-                    password: "other_password".to_string(),
+                    url: "https://other.org/x?y={some_static_addr}".to_string(),
+                    username: None,
+                    password: None,
                 }
-            ]
+            ],
         };
         let actual = read_config(&config_file_path)
             .expect("It should be possible to read the test config file.");
@@ -114,7 +113,7 @@ mod tests {
         let (_temp_dir, config_file_path) = create_temp_file(config_file_content);
 
         let expected = Config {
-            ip_addresses: vec![],
+            ip_addresses: HashMap::new(),
             ddns_entries: vec![],
         };
 

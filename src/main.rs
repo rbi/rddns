@@ -11,8 +11,9 @@ extern crate regex;
 extern crate lazy_static;
 
 mod server;
-mod updater;
 mod config;
+mod resolver;
+mod updater;
 
 use std::env;
 use std::path::PathBuf;
@@ -63,10 +64,12 @@ fn get_config_file() -> Result<PathBuf, ()> {
 fn do_update(config: &Config, addresses: &HashMap<String, String>) -> Result<(), String> {
     println!("updating DDNS entries");
 
+    let resolved_entries = resolver::resolve_config(config, addresses);
+
     let mut updater = DdnsUpdater::new();
     let mut error = String::new();
 
-    for entry in &config.ddns_entries {
+    for entry in &resolved_entries {
         let result = updater.update_dns(&entry);
         match result {
             Ok(_) => println!("Successfully updated DDNS entry {}", entry),
