@@ -7,6 +7,7 @@ use std::collections::HashMap;
 #[derive(Clone, PartialEq, Debug, Deserialize)]
 pub struct Config {
     #[serde(default)]
+    #[serde(rename = "ddns_entry")]
     pub ddns_entries: Vec<DdnsEntry>,
     #[serde(default)]
     #[serde(rename = "ip_address")]
@@ -67,12 +68,12 @@ mod tests {
         type = "static"
         address = "2001:DB8:123:abcd::1"
 
-        [[ddns_entries]]
+        [[ddns_entry]]
         url = "http://example.com/{addr1}"
         username = "someUser"
         password = "somePassword"
 
-        [[ddns_entries]]
+        [[ddns_entry]]
         url = "https://other.org/x?y={some_static_addr}"
         "#;
 

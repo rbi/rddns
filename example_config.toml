@@ -1,0 +1,54 @@
+###########################################
+### expemplary rddns configuration file ###
+###########################################
+
+# This file contains an exemplary configuration for rddns. Rddns configuration files are TOML files.
+
+##
+## ip_address
+##
+
+# Each ip_address configuration entry describes the source for a dynamic IP address. Each entry is a table of the form
+# "[ip_address.<identifier>]" where <identifier> must be replaced with a unique key that is later used to reference this
+# entry.
+# There are different types of sources for ip_address entries. The type is configured with the "type" option.
+
+# IP address sources of type "parameter" take the current IP address from a HTTP query parameter that is passed to the
+# rddns HTTP server. The current IP address must be passed via a query parameter of the form "ip.<parameter>" where
+# <parameter> is the name of the  parameter that is configured with the "parameter" option.
+# HINT: The HTTP query parameter must start with "ip." but in the parameter configuration option only the parameter name
+#       after the "ip." part must be configured. This is a common source of missconfiguration.
+#
+# The following example configures an IP address source identified by "some_address" that takes IP addresses from the
+# HTTP query parameter "ip.my_parameter". An appropriate HTTP request to the rddns server would be
+# http://rddns-server:3000?ip.my_parameter=203.0.113.19
+[ip_address.some_address]
+type = "parameter"
+parameter = "my_parameter"
+
+# IP address sourcse of type "static" use a fixed IP address that is configured with the option "address".
+[ip_address.otherAddress]
+type = "static"
+address = "2001:DB8:123:abcd::1"
+
+##
+## ddns_entry
+##
+
+# Each [[ddns_entry]] section configures a Dynamic DNS entry that should be updated. Updates are HTTP requests to an URL
+# that is configured with the "url" option. The URL can contain placeholder in the form of "{<identifier>}" where
+# <identifier> must be the identifier of one of the IP addresses sources configured in an "[ip_address]" section. These
+# placeholders will be replaced with the current IP addresse of the source on update.
+# If update reqiuieres authentication credentials can be configured with the "username" and "password" options.
+
+# The following entry is an example how to update an entry at the Hurrican Electric dynamic DNS service.
+[[ddns_entry]]
+url = "https://dyn.dns.he.net/nic/update?hostname=update.example.com?&myip={some_address}"
+username = "update.example.com"
+password = "secret"
+
+# The following example demonstrates an update at a service that does not require credentials. The URL that is called
+# would be resolved to "http://example.com/dynupdate/2001:DB8:123:abcd::1?doUpdate=true" as "otherAddress" is configured
+# above to be a static IP address.
+[[ddns_entry]]
+url = "http://example.com/dynupdate/{otherAddress}?doUpdate=true"
