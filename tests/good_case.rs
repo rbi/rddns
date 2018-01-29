@@ -10,7 +10,7 @@ use futures::future::Future;
 use rddns_driver::RddnsProcess;
 
 #[test]
-fn writes_prints_to_console_on_request() {
+fn prints_to_console_on_request() {
     // setup
     let mut core = Core::new().unwrap();
     let client = Client::new(&core.handle());
@@ -23,5 +23,6 @@ fn writes_prints_to_console_on_request() {
     });
     core.run(work).unwrap();
 
+    assert_eq!(rddns.stdout_readln(), "Listening on port 3000\n");
     assert_eq!(rddns.stdout_readln(), "updating DDNS entries\n");
 }
