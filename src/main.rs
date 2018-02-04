@@ -1,4 +1,5 @@
 extern crate tokio_core;
+#[macro_use]
 extern crate hyper;
 extern crate hyper_tls;
 extern crate futures;
@@ -35,7 +36,7 @@ fn main() {
     }
     let config = config_or_error.unwrap();
 
-    let s = server::Server::new(do_update, config);
+    let s = server::Server::new(do_update, config.server.clone(), config);
     println!("Listening on port {}", s.http_port());
     s.start_server();
 }

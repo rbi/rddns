@@ -4,18 +4,27 @@ use futures::future::Future;
 use hyper;
 use hyper::StatusCode;
 use hyper::server::{Http, Request, Response, Service, NewService};
+use hyper::header::{Authorization, Basic, Headers};
 use regex::Regex;
+
+use config::Server as ServerConfig;
+
+header!(
+    (WWWAuthenticate, "WWW-Authenticate") => Cow[str]
+);
 
 pub struct Server<T: Clone + 'static> {
     update_callback: fn(&T, &HashMap<String, String>) -> Result<(), String>,
+    server_config: ServerConfig,
     user_data: T,
 }
 
 impl<T: Clone + 'static> Server<T> {
-    pub fn new(update_callback: fn(&T, &HashMap<String, String>) -> Result<(), String>, user_data: T)
-               -> Server<T> {
+    pub fn new(update_callback: fn(&T, &HashMap<String, String>) -> Result<(), String>,
+               server_config: ServerConfig, user_data: T) -> Server<T> {
         Server {
             update_callback,
+            server_config,
             user_data,
         }
     }
@@ -24,6 +33,7 @@ impl<T: Clone + 'static> Server<T> {
         let addr = "[::]:3000".parse().unwrap();
         let service_creator: ServiceCreator<T> = ServiceCreator {
             update_callback: self.update_callback,
+            server_config: self.server_config.clone(),
             user_data: self.user_data.clone(),
         };
         let server = Http::new().bind(&addr, service_creator).unwrap();
@@ -37,6 +47,7 @@ impl<T: Clone + 'static> Server<T> {
 
 struct ServiceCreator<T> {
     update_callback: fn(&T, &HashMap<String, String>) -> Result<(), String>,
+    server_config: ServerConfig,
     user_data: T,
 }
 
@@ -49,6 +60,7 @@ impl<T: Clone> NewService for ServiceCreator<T> {
     fn new_service(&self) -> ::std::io::Result<Self::Instance> {
         Ok(RequestHandler {
             update_callback: self.update_callback,
+            server_config: self.server_config.clone(),
             user_data: self.user_data.clone(),
         })
     }
@@ -56,6 +68,7 @@ impl<T: Clone> NewService for ServiceCreator<T> {
 
 struct RequestHandler<T> {
     update_callback: fn(&T, &HashMap<String, String>) -> Result<(), String>,
+    server_config: ServerConfig,
     user_data: T,
 }
 
@@ -66,20 +79,53 @@ impl<T> Service for RequestHandler<T> {
     type Future = Box<Future<Item=Self::Response, Error=Self::Error>>;
 
     fn call(&self, req: Request) -> Self::Future {
-        let ip_parameters = extract_address_parameters(&req.query());
-        let update_result = (self.update_callback)(&self.user_data, &ip_parameters);
-        let return_code = match update_result {
-            Ok(_) => StatusCode::Ok,
-            Err(_) => StatusCode::BadGateway
+        let authorized = check_authorisation(req.headers(), &self.server_config);
+        let response = match authorized {
+            Ok(_) => {
+                let ip_parameters = extract_address_parameters(&req.query());
+                let update_result = (self.update_callback)(&self.user_data, &ip_parameters);
+                let return_code = match update_result {
+                    Ok(_) => StatusCode::Ok,
+                    Err(_) => StatusCode::BadGateway
+                };
+                let message = match update_result {
+                    Ok(_) => "success".to_string(),
+                    Err(err) => err
+                };
+                Response::new().with_status(return_code).with_body(message)
+            }
+            Err(_) => {
+                Response::new().with_status(StatusCode::Unauthorized).with_header(
+                    WWWAuthenticate::new("Basic realm=\"rddns\""))
+            }
         };
-        let message = match update_result {
-            Ok(_) => "success".to_string(),
-            Err(err) => err
-        };
-        Box::new(futures::future::ok(
-            Response::new()
-                .with_status(return_code)
-                .with_body(message)))
+
+
+        Box::new(futures::future::ok(response))
+    }
+}
+
+fn check_authorisation(headers: &Headers, config: &ServerConfig) -> Result<(), ()> {
+    match config.username {
+        Some(ref username) => {
+            let auth_header: Option<&Authorization<Basic>> = headers.get();
+            match auth_header {
+                Some(ref auth) =>
+                    if auth.username.eq(username) && match config.password {
+                        Some(ref config_password) => match auth.password {
+                            Some(ref auth_password) => config_password.eq(auth_password),
+                            None => false
+                        }
+                        None => true
+                    } {
+                        Ok(())
+                    } else {
+                        Err(())
+                    },
+                None => Err(())
+            }
+        }
+        None => Ok(())
     }
 }
 
@@ -130,5 +176,98 @@ mod tests {
         let actual = extract_address_parameters(&None);
 
         assert!(actual.is_empty());
+    }
+
+    #[test]
+    fn authorized_when_no_credentials_are_required() {
+        let conf = ServerConfig {
+            username: None,
+            password: None,
+        };
+
+        let mut headers_with_auth = Headers::new();
+        headers_with_auth.set(Authorization(
+            Basic {
+                username: "some_user".to_string(),
+                password: Some("some_password".to_string()),
+            }
+        ));
+        assert!(check_authorisation(&headers_with_auth, &conf).is_ok());
+
+        let headers_without_auth = Headers::new();
+        assert!(check_authorisation(&headers_without_auth, &conf).is_ok());
+    }
+
+    #[test]
+    fn autorized_when_correct_credentials_are_passed() {
+        let conf = ServerConfig {
+            username: Some("some_user".to_string()),
+            password: Some("some_password".to_string()),
+        };
+
+
+        let mut headers = Headers::new();
+        headers.set(Authorization(
+            Basic {
+                username: "some_user".to_string(),
+                password: Some("some_password".to_string()),
+            }
+        ));
+        assert!(check_authorisation(&headers, &conf).is_ok());
+    }
+
+    #[test]
+    fn not_authorized_when_credentials_are_required_but_wrong_or_missing() {
+        let conf = ServerConfig {
+            username: Some("some_user".to_string()),
+            password: Some("some_password".to_string()),
+        };
+
+        let headers_without_auth = Headers::new();
+        assert!(check_authorisation(&headers_without_auth, &conf).is_err());
+
+        let mut headers_with_wrong_pw = Headers::new();
+        headers_with_wrong_pw.set(Authorization(
+            Basic {
+                username: "some_user".to_string(),
+                password: Some("other_password".to_string()),
+            }
+        ));
+        assert!(check_authorisation(&headers_with_wrong_pw, &conf).is_err());
+
+        let mut headers_with_wrong_user = Headers::new();
+        headers_with_wrong_user.set(Authorization(
+            Basic {
+                username: "other_user".to_string(),
+                password: Some("some_password".to_string()),
+            }
+        ));
+        assert!(check_authorisation(&headers_with_wrong_user, &conf).is_err());
+    }
+
+    #[test]
+    fn authorization_works_for_username_without_password_config() {
+        let conf = ServerConfig {
+            username: Some("some_user".to_string()),
+            password: None,
+        };
+
+        let mut headers_with_right_user = Headers::new();
+        headers_with_right_user.set(Authorization(
+            Basic {
+                username: "some_user".to_string(),
+                password: None,
+            }
+        ));
+        assert!(check_authorisation(&headers_with_right_user, &conf).is_ok());
+
+        let mut headers_with_wrong_user = Headers::new();
+        headers_with_wrong_user.set(Authorization(
+            Basic {
+                username: "other_user".to_string(),
+                password: None,
+            }
+        ));
+        assert!(check_authorisation(&headers_with_wrong_user, &conf).is_err());
     }
 }

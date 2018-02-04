@@ -52,3 +52,16 @@ password = "secret"
 # above to be a static IP address.
 [[ddns_entry]]
 url = "http://example.com/dynupdate/{otherAddress}?doUpdate=true"
+
+##
+## server
+##
+
+# This section configures the embedded HTTP server. It is optional. When it is missing default values will be used as
+# described bellow.
+[server]
+# Configures username/password credentials that must be passed in HTTP requests to authorize update requests. BASIC auth
+# must be used. When invalid credentials are supplied no DDNS updates are triggered.
+# When no credentials are configured anybody can trigger DDNS updates via HTTP without authorization.
+username = "admin"
+password = "S3cr3T"

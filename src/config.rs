@@ -7,11 +7,28 @@ use std::collections::HashMap;
 #[derive(Clone, PartialEq, Debug, Deserialize)]
 pub struct Config {
     #[serde(default)]
+    pub server: Server,
+    #[serde(default)]
     #[serde(rename = "ddns_entry")]
     pub ddns_entries: Vec<DdnsEntry>,
     #[serde(default)]
     #[serde(rename = "ip_address")]
     pub ip_addresses: HashMap<String, IpAddress>,
+}
+
+#[derive(Clone, PartialEq, Debug, Deserialize)]
+pub struct Server {
+    pub username: Option<String>,
+    pub password: Option<String>,
+}
+
+impl Default for Server {
+    fn default() -> Self {
+        Server {
+            username: None,
+            password: None,
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
@@ -60,6 +77,10 @@ mod tests {
     #[test]
     fn can_read_maximal_config_file() {
         let config_file_content = br#"
+        [server]
+        username = "a_user"
+        password = "a_password"
+
         [ip_address.addr1]
         type = "parameter"
         parameter = "addr1"
@@ -87,6 +108,10 @@ mod tests {
             address: "2001:DB8:123:abcd::1".to_string(),
         });
         let expected = Config {
+            server: Server {
+                username: Some("a_user".to_string()),
+                password: Some("a_password".to_string()),
+            },
             ip_addresses,
             ddns_entries: vec![
                 DdnsEntry {
@@ -114,6 +139,10 @@ mod tests {
         let (_temp_dir, config_file_path) = create_temp_file(config_file_content);
 
         let expected = Config {
+            server: Server {
+                username: None,
+                password: None,
+            },
             ip_addresses: HashMap::new(),
             ddns_entries: vec![],
         };
