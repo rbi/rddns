@@ -17,6 +17,7 @@ pub struct Server<T: Clone + 'static> {
     update_callback: fn(&T, &HashMap<String, String>) -> Result<(), String>,
     server_config: ServerConfig,
     user_data: T,
+    port: u16,
 }
 
 impl<T: Clone + 'static> Server<T> {
@@ -24,13 +25,14 @@ impl<T: Clone + 'static> Server<T> {
                server_config: ServerConfig, user_data: T) -> Server<T> {
         Server {
             update_callback,
+            port: server_config.port.unwrap_or(3092),
             server_config,
             user_data,
         }
     }
 
     pub fn start_server(&self) {
-        let addr = "[::]:3000".parse().unwrap();
+        let addr = format!("[::]:{}", self.port).parse().unwrap();
         let service_creator: ServiceCreator<T> = ServiceCreator {
             update_callback: self.update_callback,
             server_config: self.server_config.clone(),
@@ -41,7 +43,7 @@ impl<T: Clone + 'static> Server<T> {
     }
 
     pub fn http_port(&self) -> u16 {
-        3000
+        self.port
     }
 }
 
@@ -183,6 +185,7 @@ mod tests {
         let conf = ServerConfig {
             username: None,
             password: None,
+            port: None,
         };
 
         let mut headers_with_auth = Headers::new();
@@ -203,6 +206,7 @@ mod tests {
         let conf = ServerConfig {
             username: Some("some_user".to_string()),
             password: Some("some_password".to_string()),
+            port: None,
         };
 
 
@@ -221,6 +225,7 @@ mod tests {
         let conf = ServerConfig {
             username: Some("some_user".to_string()),
             password: Some("some_password".to_string()),
+            port: None,
         };
 
         let headers_without_auth = Headers::new();
@@ -250,6 +255,7 @@ mod tests {
         let conf = ServerConfig {
             username: Some("some_user".to_string()),
             password: None,
+            port: None,
         };
 
         let mut headers_with_right_user = Headers::new();

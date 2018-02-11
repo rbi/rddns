@@ -5,8 +5,8 @@ can only update one DynDNS entry at a time.
 Updates are triggered by HTTP calls to the HTTP server embedded in rddns.
 
 # Status
-Rddns is functional but lacks some basic functionality like proper error handling or configurability of the embedded
-HTTP server.
+Rddns is functional but lacks some basic functionality like proper error handling or updating entries with IP addresses
+passed on the command line instead of updating via an HTTP server.
 
 # Usage
 Rddns is started by passing a configuration file as parameter.

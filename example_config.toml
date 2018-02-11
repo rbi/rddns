@@ -65,3 +65,6 @@ url = "http://example.com/dynupdate/{otherAddress}?doUpdate=true"
 # When no credentials are configured anybody can trigger DDNS updates via HTTP without authorization.
 username = "admin"
 password = "S3cr3T"
+# The TCP port the server should listen on.
+# Defaults to 3092 if missing.
+port = 3042

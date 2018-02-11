@@ -20,6 +20,7 @@ pub struct Config {
 pub struct Server {
     pub username: Option<String>,
     pub password: Option<String>,
+    pub port: Option<u16>
 }
 
 impl Default for Server {
@@ -27,6 +28,7 @@ impl Default for Server {
         Server {
             username: None,
             password: None,
+            port: None
         }
     }
 }
@@ -80,6 +82,7 @@ mod tests {
         [server]
         username = "a_user"
         password = "a_password"
+        port = 3001
 
         [ip_address.addr1]
         type = "parameter"
@@ -111,6 +114,7 @@ mod tests {
             server: Server {
                 username: Some("a_user".to_string()),
                 password: Some("a_password".to_string()),
+                port: Some(3001)
             },
             ip_addresses,
             ddns_entries: vec![
@@ -142,6 +146,7 @@ mod tests {
             server: Server {
                 username: None,
                 password: None,
+                port: None
             },
             ip_addresses: HashMap::new(),
             ddns_entries: vec![],
