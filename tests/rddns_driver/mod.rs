@@ -38,7 +38,7 @@ impl RddnsProcess {
     }
 
     pub fn get_url(&self) -> &str {
-        "http://localhost:3000"
+        "http://localhost:3092"
     }
 
     pub fn stdout_readln(&mut self) -> String {

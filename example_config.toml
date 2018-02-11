@@ -21,7 +21,7 @@
 #
 # The following example configures an IP address source identified by "some_address" that takes IP addresses from the
 # HTTP query parameter "ip.my_parameter". An appropriate HTTP request to the rddns server would be
-# http://rddns-server:3000?ip.my_parameter=203.0.113.19
+# http://rddns-server:3092?ip.my_parameter=203.0.113.19
 [ip_address.some_address]
 type = "parameter"
 parameter = "my_parameter"
