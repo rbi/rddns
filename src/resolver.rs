@@ -10,18 +10,30 @@ pub struct ResolvedDdnsEntry {
     pub password: Option<String>,
 }
 
+#[derive(Clone, PartialEq, Debug)]
+pub struct ResolveFailed {
+    pub template_url: String,
+    pub message: String,
+}
+
 impl Display for ResolvedDdnsEntry {
     fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
         write!(f, "{}", self.url)
     }
 }
 
-pub fn resolve_config(config: &Config, addresses: &HashMap<String, String>) -> Vec<ResolvedDdnsEntry> {
+impl Display for ResolveFailed {
+    fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
+        write!(f, "{}", self.template_url)
+    }
+}
+
+pub fn resolve_config(config: &Config, addresses: &HashMap<String, String>)-> Vec<Result<ResolvedDdnsEntry, ResolveFailed>> {
     resolve(&config.ddns_entries, &config.ip_addresses, addresses)
 }
 
 pub fn resolve(entries: &Vec<DdnsEntry>, address_defs: &HashMap<String, IpAddress>,
-               address_actual: &HashMap<String, String>) -> Vec<ResolvedDdnsEntry> {
+               address_actual: &HashMap<String, String>) -> Vec<Result<ResolvedDdnsEntry, ResolveFailed>>  {
     let resolved_addresses = resolve_addresses(address_defs, address_actual);
 
     let mut resolved = Vec::new();
@@ -32,11 +44,11 @@ pub fn resolve(entries: &Vec<DdnsEntry>, address_defs: &HashMap<String, IpAddres
                 resolved_url = resolved_url.replace(addr_key, addr_value);
             }
         }
-        resolved.push(ResolvedDdnsEntry {
+        resolved.push(Ok(ResolvedDdnsEntry {
             url: resolved_url,
             username: entry.username.clone(),
             password: entry.password.clone(),
-        })
+        }))
     }
     resolved
 }
@@ -87,19 +99,19 @@ mod tests {
         // ip1 should be statically resolved and not taken from the map
         address_values.insert("ip1".to_string(), "203.0.113.92".to_string());
 
-        let expected = vec![ResolvedDdnsEntry {
+        let expected = vec![Ok(ResolvedDdnsEntry {
             url: "http://someHost/path/2001:DB8:123:beef::42?update=203.0.113.25".to_string(),
             username: Some("user".to_string()),
             password: Some("pass".to_string()),
-        }, ResolvedDdnsEntry {
+        }), Ok(ResolvedDdnsEntry {
             url: "http://otherHost?ip=203.0.113.25".to_string(),
             username: None,
             password: None,
-        }];
+        })];
 
         let actual = resolve(&some_entries(), &address_defs, &address_values);
 
-        assert_eq!(actual, expected)
+        assert_eq!(actual, expected);
     }
 
     #[test]
@@ -115,15 +127,15 @@ mod tests {
         address_values.insert("ip1".to_string(), "203.0.113.39".to_string());
         address_values.insert("different_parameter".to_string(), "2001:DB8:a2f3::29".to_string());
 
-        let expected = vec![ResolvedDdnsEntry {
+        let expected = vec![Ok(ResolvedDdnsEntry {
             url: "http://someHost/path/203.0.113.39?update=2001:DB8:a2f3::29".to_string(),
             username: Some("user".to_string()),
             password: Some("pass".to_string()),
-        }, ResolvedDdnsEntry {
+        }), Ok(ResolvedDdnsEntry {
             url: "http://otherHost?ip=2001:DB8:a2f3::29".to_string(),
             username: None,
             password: None,
-        }];
+        })];
 
         let actual = resolve(&some_entries(), &address_defs, &address_values);
 

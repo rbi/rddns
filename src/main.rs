@@ -19,6 +19,7 @@ mod updater;
 use std::env;
 use std::path::PathBuf;
 use std::collections::HashMap;
+use std::fmt::Display;
 
 use config::Config;
 use updater::DdnsUpdater;
@@ -70,16 +71,16 @@ fn do_update(config: &Config, addresses: &HashMap<String, String>) -> Result<(),
     let mut updater = DdnsUpdater::new();
     let mut error = String::new();
 
-    for entry in &resolved_entries {
-        let result = updater.update_dns(&entry);
-        match result {
-            Ok(_) => println!("Successfully updated DDNS entry {}", entry),
-            Err(e) => {
-                let error_text = format!("Updating DDNS \"{}\" failed. Reason: {}", entry, e);
-                eprintln!("{}", error_text);
-                error.push_str(&error_text);
-                error.push('\n');
+    for entry in resolved_entries {
+        match entry {
+            Ok(ref resolved) => {
+                let result = updater.update_dns(resolved);
+                match result {
+                    Ok(_) => println!("Successfully updated DDNS entry {}", resolved),
+                    Err(e) => handle_error_while_updating(&mut error, resolved, & e)
+                }
             }
+            Err(ref e) => handle_error_while_updating(&mut error, e, & e.message)
         }
     }
     if error.is_empty() {
@@ -87,4 +88,11 @@ fn do_update(config: &Config, addresses: &HashMap<String, String>) -> Result<(),
     } else {
         Err(error.to_string())
     }
+}
+
+fn handle_error_while_updating(error: &mut String, entity: &Display, message: &String) {
+    let error_text = format!("Updating DDNS \"{}\" failed. Reason: {}", entity, message);
+    eprintln!("{}", error_text);
+    error.push_str(&error_text);
+    error.push('\n');
 }
