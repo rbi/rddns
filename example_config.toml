@@ -14,14 +14,12 @@
 # There are different types of sources for ip_address entries. The type is configured with the "type" option.
 
 # IP address sources of type "parameter" take the current IP address from a HTTP query parameter that is passed to the
-# rddns HTTP server. The current IP address must be passed via a query parameter of the form "ip.<parameter>" where
+# rddns HTTP server. The current IP address must be passed via a query parameter of the form "ip[<parameter>]" where
 # <parameter> is the name of the  parameter that is configured with the "parameter" option.
-# HINT: The HTTP query parameter must start with "ip." but in the parameter configuration option only the parameter name
-#       after the "ip." part must be configured. This is a common source of missconfiguration.
 #
 # The following example configures an IP address source identified by "some_address" that takes IP addresses from the
-# HTTP query parameter "ip.my_parameter". An appropriate HTTP request to the rddns server would be
-# http://rddns-server:3092?ip.my_parameter=203.0.113.19
+# HTTP query parameter "ip[my_parameter]". An appropriate HTTP request to the rddns server would be
+# http://rddns-server:3092?ip[my_parameter]=203.0.113.19
 [ip_address.some_address]
 type = "parameter"
 parameter = "my_parameter"

@@ -150,7 +150,7 @@ fn extract_address_parameters(query: &Option<&str>) -> HashMap<String, String> {
 
 fn to_address_param(param: &str) -> Option<(String, String)> {
     lazy_static! {
-        static ref IP_PARAM: Regex = Regex::new(r"ip\.([^=]+)=(.+)").unwrap();
+        static ref IP_PARAM: Regex = Regex::new(r"ip\[([^\]]+)]=(.+)").unwrap();
     }
 
     IP_PARAM.captures(param).map(|groups| (groups[1].to_string(), groups[2].to_string()))
@@ -166,8 +166,8 @@ mod tests {
         expected.insert("first".to_string(), "2001:DB8:123:abcd::1".to_string());
         expected.insert("other".to_string(), "203.0.113.85".to_string());
 
-        let query = Some("ip.first=2001:DB8:123:abcd::1&abitrary_param=abc&ip.other=203.0.113.85\
-&broken_param&ip.=broken&ip=broken_too");
+        let query = Some("ip[first]=2001:DB8:123:abcd::1&abitrary_param=abc&ip[other]=203.0.113.85\
+&broken_param&ip[=broken&ip=broken_too");
         let actual = extract_address_parameters(&query);
 
         assert_eq!(actual, expected);
