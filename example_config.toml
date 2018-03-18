@@ -26,7 +26,7 @@
 type = "parameter"
 parameter = "my_parameter"
 
-# IP address sourcse of type "static" use a fixed IP address that is configured with the option "address".
+# IP address sources of type "static" use a fixed IP address that is configured with the option "address".
 [ip_address.otherAddress]
 type = "static"
 address = "2001:DB8:123:abcd::1"
