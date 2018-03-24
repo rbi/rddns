@@ -23,6 +23,6 @@ fn prints_to_console_on_request() {
     });
     core.run(work).unwrap();
 
-    assert_eq!(rddns.stdout_readln(), "Listening on port 3092\n");
-    assert_eq!(rddns.stdout_readln(), "updating DDNS entries\n");
+    assert!(rddns.stdout_readln().ends_with("Listening on port 3092\n"));
+    assert!(rddns.stdout_readln().ends_with("updating DDNS entries\n"));
 }

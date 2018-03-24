@@ -11,6 +11,9 @@ extern crate regex;
 #[macro_use]
 extern crate lazy_static;
 
+#[macro_use] extern crate log;
+extern crate simplelog;
+
 mod server;
 mod config;
 mod resolver;
@@ -21,10 +24,14 @@ use std::path::PathBuf;
 use std::collections::HashMap;
 use std::fmt::Display;
 
+use simplelog::{TermLogger, LevelFilter, Config as SimpleLogConfig};
+
 use config::Config;
 use updater::DdnsUpdater;
 
 fn main() {
+    TermLogger::init(LevelFilter::Info, SimpleLogConfig::default()).unwrap();
+
     let config_file = get_config_file();
     if config_file.is_err() {
         return;
@@ -32,13 +39,13 @@ fn main() {
 
     let config_or_error = config::read_config(&config_file.unwrap());
     if config_or_error.is_err() {
-        eprintln!("{}", config_or_error.unwrap_err());
+        error!("{}", config_or_error.unwrap_err());
         return;
     }
     let config = config_or_error.unwrap();
 
     let s = server::Server::new(do_update, config.server.clone(), config);
-    println!("Listening on port {}", s.http_port());
+    info!("Listening on port {}", s.http_port());
     s.start_server();
 }
 
@@ -49,14 +56,14 @@ fn get_config_file() -> Result<PathBuf, ()> {
     let usage = format!("Usage: {} [config-file]", executable);
     let path_string = args.next();
     if path_string.is_none() {
-        eprintln!("No configuration file was specified.");
-        println!("{}", usage);
+        error!("No configuration file was specified.");
+        info!("{}", usage);
         return Err(());
     }
     let path = PathBuf::from(path_string.unwrap());
     if !path.is_file() {
-        eprintln!("\"{}\" is not a valid path to a config file.", path.to_str().unwrap());
-        println!("{}", usage);
+        error!("\"{}\" is not a valid path to a config file.", path.to_str().unwrap());
+        info!("{}", usage);
         return Err(());
     }
 
@@ -64,7 +71,7 @@ fn get_config_file() -> Result<PathBuf, ()> {
 }
 
 fn do_update(config: &Config, addresses: &HashMap<String, String>) -> Result<(), String> {
-    println!("updating DDNS entries");
+    info!("updating DDNS entries");
 
     let resolved_entries = resolver::resolve_config(config, addresses);
 
@@ -76,7 +83,7 @@ fn do_update(config: &Config, addresses: &HashMap<String, String>) -> Result<(),
             Ok(ref resolved) => {
                 let result = updater.update_dns(resolved);
                 match result {
-                    Ok(_) => println!("Successfully updated DDNS entry {}", resolved),
+                    Ok(_) => info!("Successfully updated DDNS entry {}", resolved),
                     Err(e) => handle_error_while_updating(&mut error, resolved, & e)
                 }
             }
@@ -92,7 +99,7 @@ fn do_update(config: &Config, addresses: &HashMap<String, String>) -> Result<(),
 
 fn handle_error_while_updating(error: &mut String, entity: &Display, message: &String) {
     let error_text = format!("Updating DDNS \"{}\" failed. Reason: {}", entity, message);
-    eprintln!("{}", error_text);
+    error!("{}", error_text);
     error.push_str(&error_text);
     error.push('\n');
 }

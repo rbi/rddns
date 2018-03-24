@@ -13,6 +13,8 @@ serde = "1.0.27"
 serde_derive = "1.0.27"
 regex = "0.2"
 lazy_static = "1.0.0"
+log = "0.4.0"
+simplelog = "0.5.1"
 
 [dev-dependencies]
 tempdir = "0.3.5"
