@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use std::net::IpAddr;
 use regex::Regex;
 
 use config::{Config, IpAddress, DdnsEntry};
@@ -29,12 +30,12 @@ impl Display for ResolveFailed {
     }
 }
 
-pub fn resolve_config(config: &Config, addresses: &HashMap<String, String>) -> Vec<Result<ResolvedDdnsEntry, ResolveFailed>> {
+pub fn resolve_config(config: &Config, addresses: &HashMap<String, IpAddr>) -> Vec<Result<ResolvedDdnsEntry, ResolveFailed>> {
     resolve(&config.ddns_entries, &config.ip_addresses, addresses)
 }
 
 pub fn resolve(entries: &Vec<DdnsEntry>, address_defs: &HashMap<String, IpAddress>,
-               address_actual: &HashMap<String, String>) -> Vec<Result<ResolvedDdnsEntry, ResolveFailed>> {
+               address_actual: &HashMap<String, IpAddr>) -> Vec<Result<ResolvedDdnsEntry, ResolveFailed>> {
     let resolved_addresses = resolve_addresses(address_defs, address_actual);
 
     entries.iter()
@@ -42,11 +43,11 @@ pub fn resolve(entries: &Vec<DdnsEntry>, address_defs: &HashMap<String, IpAddres
         .collect()
 }
 
-fn resolve_entry(entry: &DdnsEntry, resolved_addresses: &HashMap<String, &String>) -> Result<ResolvedDdnsEntry, ResolveFailed> {
+fn resolve_entry(entry: &DdnsEntry, resolved_addresses: &HashMap<String, &IpAddr>) -> Result<ResolvedDdnsEntry, ResolveFailed> {
     let mut resolved_url = entry.url.clone();
     for (addr_key, addr_value) in resolved_addresses.iter() {
         if resolved_url.contains(addr_key) {
-            resolved_url = resolved_url.replace(addr_key, addr_value);
+            resolved_url = resolved_url.replace(addr_key, &addr_value.to_string());
         }
     }
 
@@ -69,7 +70,7 @@ fn resolve_entry(entry: &DdnsEntry, resolved_addresses: &HashMap<String, &String
 }
 
 fn resolve_addresses<'a>(address_defs: &'a HashMap<String, IpAddress>,
-                         address_actual: &'a HashMap<String, String>) -> HashMap<String, &'a String> {
+                         address_actual: &'a HashMap<String, IpAddr>) -> HashMap<String, &'a IpAddr> {
     let mut resolved = HashMap::new();
 
     for (name, def) in address_defs {
@@ -104,17 +105,17 @@ mod tests {
     fn resolve_handles_static_addresses() {
         let mut address_defs = HashMap::new();
         address_defs.insert("ip1".to_string(), IpAddress::Static {
-            address: "2001:DB8:123:beef::42".to_string()
+            address: "2001:DB8:123:beef::42".parse().unwrap()
         });
         address_defs.insert("other_ip".to_string(), IpAddress::Static {
-            address: "203.0.113.25".to_string()
+            address: "203.0.113.25".parse().unwrap()
         });
         let mut address_values = HashMap::new();
         // ip1 should be statically resolved and not taken from the map
-        address_values.insert("ip1".to_string(), "203.0.113.92".to_string());
+        address_values.insert("ip1".to_string(), "203.0.113.92".parse().unwrap());
 
         let expected = vec![Ok(ResolvedDdnsEntry {
-            url: "http://someHost/path/2001:DB8:123:beef::42?update=203.0.113.25".to_string(),
+            url: "http://someHost/path/2001:db8:123:beef::42?update=203.0.113.25".to_string(),
             username: Some("user".to_string()),
             password: Some("pass".to_string()),
         }), Ok(ResolvedDdnsEntry {
@@ -138,15 +139,15 @@ mod tests {
             parameter: "different_parameter".to_string()
         });
         let mut address_values = HashMap::new();
-        address_values.insert("ip1".to_string(), "203.0.113.39".to_string());
-        address_values.insert("different_parameter".to_string(), "2001:DB8:a2f3::29".to_string());
+        address_values.insert("ip1".to_string(), "203.0.113.39".parse().unwrap());
+        address_values.insert("different_parameter".to_string(), "2001:DB8:a2f3::29".parse().unwrap());
 
         let expected = vec![Ok(ResolvedDdnsEntry {
-            url: "http://someHost/path/203.0.113.39?update=2001:DB8:a2f3::29".to_string(),
+            url: "http://someHost/path/203.0.113.39?update=2001:db8:a2f3::29".to_string(),
             username: Some("user".to_string()),
             password: Some("pass".to_string()),
         }), Ok(ResolvedDdnsEntry {
-            url: "http://otherHost?ip=2001:DB8:a2f3::29".to_string(),
+            url: "http://otherHost?ip=2001:db8:a2f3::29".to_string(),
             username: None,
             password: None,
         })];
@@ -163,7 +164,7 @@ mod tests {
             parameter: "different_parameter".to_string()
         });
         let mut address_values = HashMap::new();
-        address_values.insert("different_parameter".to_string(), "2001:DB8:a2f3::29".to_string());
+        address_values.insert("different_parameter".to_string(), "2001:DB8:a2f3::29".parse().unwrap());
 
         let actual = resolve(&some_entries(), &address_defs, &address_values);
 
@@ -184,7 +185,7 @@ mod tests {
             parameter: "different_parameter".to_string()
         });
         let mut address_values = HashMap::new();
-        address_values.insert("ip1".to_string(), "203.0.113.39".to_string());
+        address_values.insert("ip1".to_string(), "203.0.113.39".parse().unwrap());
 
         let actual = resolve(&some_entries(), &address_defs, &address_values);
 

@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::{Error, ErrorKind, Read};
 use std::fmt::{Display, Formatter};
 use std::collections::HashMap;
+use std::net::IpAddr;
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
 pub struct Config {
@@ -55,7 +56,7 @@ pub enum IpAddress {
     },
     #[serde(rename = "static")]
     Static {
-        address: String,
+        address: IpAddr,
     },
 }
 
@@ -108,7 +109,7 @@ mod tests {
             parameter: "addr1".to_string()
         });
         ip_addresses.insert("some_static_addr".to_string(), IpAddress::Static {
-            address: "2001:DB8:123:abcd::1".to_string(),
+            address: "2001:DB8:123:abcd::1".parse().unwrap(),
         });
         let expected = Config {
             server: Server {

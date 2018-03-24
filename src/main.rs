@@ -23,6 +23,7 @@ use std::env;
 use std::path::PathBuf;
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::net::IpAddr;
 
 use simplelog::{TermLogger, LevelFilter, Config as SimpleLogConfig};
 
@@ -70,7 +71,7 @@ fn get_config_file() -> Result<PathBuf, ()> {
     Ok(path)
 }
 
-fn do_update(config: &Config, addresses: &HashMap<String, String>) -> Result<(), String> {
+fn do_update(config: &Config, addresses: &HashMap<String, IpAddr>) -> Result<(), String> {
     info!("updating DDNS entries");
 
     let resolved_entries = resolver::resolve_config(config, addresses);

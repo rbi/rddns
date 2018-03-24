@@ -6,6 +6,7 @@ use hyper::StatusCode;
 use hyper::server::{Http, Request, Response, Service, NewService};
 use hyper::header::{Authorization, Basic, Headers};
 use regex::Regex;
+use std::net::IpAddr;
 
 use config::Server as ServerConfig;
 
@@ -14,14 +15,14 @@ header!(
 );
 
 pub struct Server<T: Clone + 'static> {
-    update_callback: fn(&T, &HashMap<String, String>) -> Result<(), String>,
+    update_callback: fn(&T, &HashMap<String, IpAddr>) -> Result<(), String>,
     server_config: ServerConfig,
     user_data: T,
     port: u16,
 }
 
 impl<T: Clone + 'static> Server<T> {
-    pub fn new(update_callback: fn(&T, &HashMap<String, String>) -> Result<(), String>,
+    pub fn new(update_callback: fn(&T, &HashMap<String, IpAddr>) -> Result<(), String>,
                server_config: ServerConfig, user_data: T) -> Server<T> {
         Server {
             update_callback,
@@ -48,7 +49,7 @@ impl<T: Clone + 'static> Server<T> {
 }
 
 struct ServiceCreator<T> {
-    update_callback: fn(&T, &HashMap<String, String>) -> Result<(), String>,
+    update_callback: fn(&T, &HashMap<String, IpAddr>) -> Result<(), String>,
     server_config: ServerConfig,
     user_data: T,
 }
@@ -69,7 +70,7 @@ impl<T: Clone> NewService for ServiceCreator<T> {
 }
 
 struct RequestHandler<T> {
-    update_callback: fn(&T, &HashMap<String, String>) -> Result<(), String>,
+    update_callback: fn(&T, &HashMap<String, IpAddr>) -> Result<(), String>,
     server_config: ServerConfig,
     user_data: T,
 }
@@ -131,14 +132,20 @@ fn check_authorisation(headers: &Headers, config: &ServerConfig) -> Result<(), (
     }
 }
 
-fn extract_address_parameters(query: &Option<&str>) -> HashMap<String, String> {
-    let mut map: HashMap<String, String> = HashMap::new();
+fn extract_address_parameters(query: &Option<&str>) -> HashMap<String, IpAddr> {
+    let mut map: HashMap<String, IpAddr> = HashMap::new();
     let iter = query.map(|q| q.split("&"));
     match iter {
         Some(params) => for param in params {
             let address_param = to_address_param(param);
             match address_param {
-                Some((key, value)) => map.insert(key, value),
+                Some((key, value)) => match value.parse() {
+                    Ok(addr) => map.insert(key, addr),
+                    Err(_) => {
+                        warn!("Value passed for IP address parameter \"{}\" is not a valid IP address. Ignoring it.", key);
+                        None
+                    }
+                },
                 _ => None
             };
         },
@@ -163,14 +170,26 @@ mod tests {
     #[test]
     fn extract_address_parameters_correctly() {
         let mut expected = HashMap::new();
-        expected.insert("first".to_string(), "2001:DB8:123:abcd::1".to_string());
-        expected.insert("other".to_string(), "203.0.113.85".to_string());
+        expected.insert("first".to_string(), "2001:DB8:123:abcd::1".parse().unwrap());
+        expected.insert("other".to_string(), "203.0.113.85".parse().unwrap());
 
         let query = Some("ip[first]=2001:DB8:123:abcd::1&abitrary_param=abc&ip[other]=203.0.113.85\
 &broken_param&ip[=broken&ip=broken_too");
         let actual = extract_address_parameters(&query);
 
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn extract_address_parameters_not_failing_on_invalid_ip_addresses() {
+        let mut expected = HashMap::new();
+        expected.insert("other".to_string(), "203.0.113.85".parse().unwrap());
+
+        let query = Some("ip[first]=invalid_address&ip[other]=203.0.113.85");
+        let actual = extract_address_parameters(&query);
+
+        assert_eq!(actual, expected);
+
     }
 
     #[test]
@@ -202,7 +221,7 @@ mod tests {
     }
 
     #[test]
-    fn autorized_when_correct_credentials_are_passed() {
+    fn authorized_when_correct_credentials_are_passed() {
         let conf = ServerConfig {
             username: Some("some_user".to_string()),
             password: Some("some_password".to_string()),
