@@ -31,7 +31,11 @@ use config::Config;
 use updater::DdnsUpdater;
 
 fn main() {
-    TermLogger::init(LevelFilter::Info, SimpleLogConfig::default()).unwrap();
+    let logger = TermLogger::init(LevelFilter::Info, SimpleLogConfig::default());
+    if logger.is_err() {
+        eprintln!("{}", logger.unwrap_err());
+        return;
+    }
 
     let config_file = get_config_file();
     if config_file.is_err() {
