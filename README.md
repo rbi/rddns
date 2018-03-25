@@ -4,9 +4,12 @@ Its main use case it to update multiple DynDNS records at once when an update is
 can only update one DynDNS entry at a time.
 Updates are triggered by HTTP calls to the HTTP server embedded in rddns.
 
-# Status
-Rddns is functional but lacks some basic functionality like updating entries with IP addresses passed on the
-command line instead of updating via an HTTP server.
+# Key Features
+* Trigger DynDNS updates with HTTP calls to rddns.
+* Update multiple dynamic DNS entries with different IP addresses with a single call.
+* Combine different IP addresses to new ones used for updating DynDNS entries.
+  * E.g. Combine a dynamically assigned IPv6 subnet with the static IPv6 host parts of all devices in the subnet and
+    update DynDNS entries for all of them.
 
 # Usage
 Rddns is started by passing a configuration file as parameter.
@@ -21,7 +24,7 @@ The port it is listening on will be printed to the console.
 On each incoming request an update will be triggered.
 
 # Install
-Currently no pre compiled executables are available.
+Currently no official pre compiled executables are available.
 They have to be created by compiling the source manually.
 
 # Build

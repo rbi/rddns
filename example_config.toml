@@ -29,6 +29,23 @@ parameter = "my_parameter"
 type = "static"
 address = "2001:DB8:123:abcd::1"
 
+# IP address sources of type "derived" combine the host part and the net part of two other ip_address entries to create
+# a new IP address. The "subnet_entry" and the "host_entry" configuration options define which other IP adresses should
+# be used for the host and for the net part.
+#
+# This is usefull to update global IPv6 addresses where the host part is fixed as it is derived from the MAC address but
+# the provider assigns a different IPv6 subnet on every reconect. The router could then pass its own IPv6 address to the
+# HTTP server of rddns. With this entry the net part of the routers IPv6 address can than be combined with the host part
+# of a device behind the router.
+#
+# E.g. given "some_address" would be resolved to fd84:d40e:6a1b:f004:4bcf:78ff:feac:8bd9 then this entry would resolve
+# to 2001:DB8:123:abcd:4bcf:78ff:feac:8bd9.
+[ip_address.calculated_address]
+type = "derived"
+subnet_bits = 64
+subnet_entry = "otherAddress"
+host_entry = "some_address"
+
 ##
 ## ddns_entry
 ##
