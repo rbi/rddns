@@ -58,6 +58,12 @@ pub enum IpAddress {
     Static {
         address: IpAddr,
     },
+    #[serde(rename = "derived")]
+    Derived {
+        subnet_bits: u8,
+        host_address: IpAddr,
+        subnet_entry: String,
+    }
 }
 
 pub fn read_config(config_file: &Path) -> Result<Config, Error> {
@@ -93,6 +99,12 @@ mod tests {
         type = "static"
         address = "2001:DB8:123:abcd::1"
 
+        [ip_address.calculated_address]
+        type = "derived"
+        subnet_bits = 64
+        subnet_entry = "addr1"
+        host_address = "0.0.0.42"
+
         [[ddns_entry]]
         url = "http://example.com/{addr1}"
         username = "someUser"
@@ -110,6 +122,11 @@ mod tests {
         });
         ip_addresses.insert("some_static_addr".to_string(), IpAddress::Static {
             address: "2001:DB8:123:abcd::1".parse().unwrap(),
+        });
+        ip_addresses.insert("calculated_address".to_string(), IpAddress::Derived {
+            subnet_bits: 64,
+            subnet_entry: "addr1".to_string(),
+            host_address: "0.0.0.42".parse().unwrap()
         });
         let expected = Config {
             server: Server {
