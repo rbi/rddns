@@ -147,7 +147,7 @@ fn resolve_derived_ipv4(net_address: &Ipv4Addr, host_address: &Ipv4Addr, subnet_
     let numbers_host = host_address.octets();
     let mut number_derived: [u8; 4] = [0; 4];
     for i in 0..4 {
-        let mut shift = subnet_bits as i16 - (i * 8);
+        let shift = subnet_bits as i16 - (i * 8);
         let netmask = if shift >= 8 { 0xFF } else if shift <= 0 { 0x00 } else { 0xFF << shift };
         let hostmask = if shift >= 8 { 0x00 } else if shift <= 0 { 0xFF } else { 0xFF >> (8 - shift) };
         number_derived[i as usize] = (numbers_net[i as usize] & netmask) | (numbers_host[i as usize] & hostmask);
@@ -165,7 +165,7 @@ fn resolve_derived_ipv6(net_address: &Ipv6Addr, host_address: &Ipv6Addr, subnet_
     let numbers_host = host_address.octets();
     let mut number_derived: [u8; 16] = [0; 16];
     for i in 0..16 {
-        let mut shift = subnet_bits as i16 - (i * 8);
+        let shift = subnet_bits as i16 - (i * 8);
         let netmask = if shift >= 8 { 0xFF } else if shift <= 0 { 0x00 } else { 0xFF << shift };
         let hostmask = if shift >= 8 { 0x00 } else if shift <= 0 { 0xFF } else { 0xFF >> (8 - shift) };
         number_derived[i as usize] = (numbers_net[i as usize] & netmask) | (numbers_host[i as usize] & hostmask);
