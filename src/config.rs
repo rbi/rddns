@@ -61,7 +61,7 @@ pub enum IpAddress {
     #[serde(rename = "derived")]
     Derived {
         subnet_bits: u8,
-        host_address: IpAddr,
+        host_entry: String,
         subnet_entry: String,
     }
 }
@@ -103,7 +103,7 @@ mod tests {
         type = "derived"
         subnet_bits = 64
         subnet_entry = "addr1"
-        host_address = "0.0.0.42"
+        host_entry = "some_static_addr"
 
         [[ddns_entry]]
         url = "http://example.com/{addr1}"
@@ -126,7 +126,7 @@ mod tests {
         ip_addresses.insert("calculated_address".to_string(), IpAddress::Derived {
             subnet_bits: 64,
             subnet_entry: "addr1".to_string(),
-            host_address: "0.0.0.42".parse().unwrap()
+            host_entry: "some_static_addr".to_string()
         });
         let expected = Config {
             server: Server {
