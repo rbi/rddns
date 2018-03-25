@@ -85,19 +85,27 @@ fn resolve_addresses<'a>(address_defs: &'a HashMap<String, IpAddress>,
         };
     }
 
-    // Derived addresses need to be resolved in a second phase after all potentintal source
-    // addresses have been resolved.
-    for (name, def) in address_defs {
-        match match def {
-            &IpAddress::Derived { subnet_bits, ref host_entry, ref subnet_entry } =>
-                resolve_derived(resolved.get(subnet_entry), resolved.get(host_entry), subnet_bits),
-            _ => None
-        } {
-            Some(address) => resolved.insert(name, address),
-            _ => None
-        };
+    // Derived addresses need to be resolved in a second phase after other potential source
+    // addresses have been resolved. Do it in a loop to support derived addresses that reference other
+    // derived addresses.
+    let mut last_size = 0;
+    for _i in 1..1000 {
+        for (name, def) in address_defs {
+            match match def {
+                &IpAddress::Derived { subnet_bits, ref host_entry, ref subnet_entry } =>
+                    resolve_derived(resolved.get(subnet_entry), resolved.get(host_entry), subnet_bits),
+                _ => None
+            } {
+                Some(address) => resolved.insert(name, address),
+                _ => None
+            };
+        }
+        // If no more entries could be resolved in this round resolving can be aborted.
+        if resolved.len() <= last_size {
+            break;
+        }
+        last_size = resolved.len();
     }
-
     resolved
 }
 
@@ -181,7 +189,7 @@ mod tests {
         }];
     }
 
-    fn some_static_address_defs() -> HashMap<String, IpAddress>{
+    fn some_static_address_defs() -> HashMap<String, IpAddress> {
         let mut address_defs = HashMap::new();
         address_defs.insert("net_ip1".to_string(), IpAddress::Static {
             address: "203.0.113.25".parse().unwrap()
@@ -190,7 +198,7 @@ mod tests {
             address: "0.0.0.42".parse().unwrap()
         });
         address_defs.insert("net_ip2".to_string(), IpAddress::Static {
-            address: "2001:DB8:a2f3::29".parse().unwrap()
+            address: "2001:DB8:a2f3:aaaa::29".parse().unwrap()
         });
         address_defs.insert("host_ip2".to_string(), IpAddress::Static {
             address: "::4bcf:78ff:feac:8bd9".parse().unwrap()
@@ -256,7 +264,7 @@ mod tests {
 
     #[test]
     fn resolve_handles_derived_addresses() {
-        let mut  address_defs = some_static_address_defs();
+        let mut address_defs = some_static_address_defs();
         // Replace some definitions with "from parameter" definitions.
         address_defs.insert("host_ip1".to_string(), IpAddress::FromParameter {
             parameter: "host_ip1_parameter".to_string()
@@ -272,7 +280,7 @@ mod tests {
         address_defs.insert("other_ip".to_string(), IpAddress::Derived {
             subnet_bits: 56,
             subnet_entry: "net_ip2".to_string(),
-            host_entry: "host_ip2".to_string()
+            host_entry: "host_ip2".to_string(),
         });
 
         let mut address_values = HashMap::new();
@@ -301,7 +309,7 @@ mod tests {
         address_defs.insert("ip1".to_string(), IpAddress::Derived {
             subnet_bits: 32,
             subnet_entry: "net_ip1".to_string(),
-            host_entry: "host_ip1".to_string()
+            host_entry: "host_ip1".to_string(),
         });
         address_defs.insert("other_ip".to_string(), IpAddress::Derived {
             subnet_bits: 128,
@@ -310,11 +318,11 @@ mod tests {
         });
 
         let expected = vec![Ok(ResolvedDdnsEntry {
-            url: "http://someHost/path/203.0.113.25?update=2001:db8:a2f3::29".to_string(),
+            url: "http://someHost/path/203.0.113.25?update=2001:db8:a2f3:aaaa::29".to_string(),
             username: Some("user".to_string()),
             password: Some("pass".to_string()),
         }), Ok(ResolvedDdnsEntry {
-            url: "http://otherHost?ip=2001:db8:a2f3::29".to_string(),
+            url: "http://otherHost?ip=2001:db8:a2f3:aaaa::29".to_string(),
             username: None,
             password: None,
         })];
@@ -331,7 +339,7 @@ mod tests {
         address_defs.insert("ip1".to_string(), IpAddress::Derived {
             subnet_bits: 0,
             subnet_entry: "net_ip1".to_string(),
-            host_entry: "host_ip1".to_string()
+            host_entry: "host_ip1".to_string(),
         });
         address_defs.insert("other_ip".to_string(), IpAddress::Derived {
             subnet_bits: 0,
@@ -354,6 +362,46 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
+
+    #[test]
+    fn resolve_handles_derived_addresses_that_reference_other_derived_addresses() {
+        let mut address_defs = some_static_address_defs();
+
+        address_defs.insert("subnet_ip".to_string(), IpAddress::Static {
+            address: "6666:7777:8888:9999::".parse().unwrap()
+        });
+        address_defs.insert("ip1".to_string(), IpAddress::Derived {
+            subnet_bits: 24,
+            subnet_entry: "net_ip1".to_string(),
+            host_entry: "host_ip1".to_string(),
+        });
+        address_defs.insert("other_ip".to_string(), IpAddress::Derived {
+            subnet_bits: 48,
+            subnet_entry: "net_ip2".to_string(),
+            host_entry: "zderived1".to_string(),
+        });
+        address_defs.insert("zderived1".to_string(), IpAddress::Derived {
+            subnet_bits: 64,
+            subnet_entry: "subnet_ip".to_string(),
+            host_entry: "host_ip2".to_string(),
+        });
+
+        let expected = vec![Ok(ResolvedDdnsEntry {
+            url: "http://someHost/path/203.0.113.42?update=2001:db8:a2f3:9999:4bcf:78ff:feac:8bd9".to_string(),
+            username: Some("user".to_string()),
+            password: Some("pass".to_string()),
+        }), Ok(ResolvedDdnsEntry {
+            url: "http://otherHost?ip=2001:db8:a2f3:9999:4bcf:78ff:feac:8bd9".to_string(),
+            username: None,
+            password: None,
+        })];
+
+        let actual = resolve(&some_entries(), &address_defs, &HashMap::new());
+
+        assert_eq!(actual, expected);
+    }
+
+
     #[test]
     fn resolve_does_not_fail_on_invalid_subnets() {
         let mut address_defs = some_static_address_defs();
@@ -361,7 +409,7 @@ mod tests {
         address_defs.insert("ip1".to_string(), IpAddress::Derived {
             subnet_bits: 64,
             subnet_entry: "net_ip1".to_string(),
-            host_entry: "host_ip1".to_string()
+            host_entry: "host_ip1".to_string(),
         });
         address_defs.insert("other_ip".to_string(), IpAddress::Derived {
             subnet_bits: 129,
@@ -378,13 +426,12 @@ mod tests {
 
     #[test]
     fn resolve_does_not_fail_on_net_and_host_having_different_ip_versions() {
-
         let mut address_defs = some_static_address_defs();
 
         address_defs.insert("ip1".to_string(), IpAddress::Derived {
             subnet_bits: 24,
             subnet_entry: "net_ip1".to_string(),
-            host_entry: "host_ip2".to_string()
+            host_entry: "host_ip2".to_string(),
         });
         address_defs.insert("other_ip".to_string(), IpAddress::Derived {
             subnet_bits: 24,
