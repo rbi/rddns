@@ -5,13 +5,12 @@
 # This file contains an exemplary configuration for rddns. Rddns configuration files are TOML files.
 
 ##
-## ip_address
+## ip addresses
 ##
 
-# Each ip_address configuration entry describes the source for a dynamic IP address. Each entry is a table of the form
-# "[ip_address.<identifier>]" where <identifier> must be replaced with a unique key that is later used to reference this
-# entry.
-# There are different types of sources for ip_address entries. The type is configured with the "type" option.
+# Each "ip" configuration entry describes the source for a dynamic IP address. Each entry is a table of the form
+# "[ip.<identifier>]" where <identifier> must be replaced with a unique key that is later used to reference this entry.
+# There are different types of sources for "ip" entries. The type is configured with the "type" option.
 
 # IP address sources of type "parameter" take the current IP address from a HTTP query parameter that is passed to the
 # rddns HTTP server. The current IP address must be passed via a query parameter of the form "ip[<parameter>]" where
@@ -20,18 +19,18 @@
 # The following example configures an IP address source identified by "some_address" that takes IP addresses from the
 # HTTP query parameter "ip[my_parameter]". An appropriate HTTP request to the rddns server would be
 # http://rddns-server:3092?ip[my_parameter]=203.0.113.19
-[ip_address.some_address]
+[ip.some_address]
 type = "parameter"
 parameter = "my_parameter"
 
 # IP address sources of type "static" use a fixed IP address that is configured with the option "address".
-[ip_address.otherAddress]
+[ip.otherAddress]
 type = "static"
 address = "2001:DB8:123:abcd::1"
 
-# IP address sources of type "derived" combine the host part and the net part of two other ip_address entries to create
-# a new IP address. The "subnet_entry" and the "host_entry" configuration options define which other IP adresses should
-# be used for the host and for the net part.
+# IP address sources of type "derived" combine the host part and the net part of two other "ip" entries to create a new
+# IP address. The "subnet_entry" and the "host_entry" configuration options define which other IP adresses should be
+# used for the host and for the net part.
 #
 # This is usefull to update global IPv6 addresses where the host part is fixed as it is derived from the MAC address but
 # the provider assigns a different IPv6 subnet on every reconect. The router could then pass its own IPv6 address to the
@@ -40,7 +39,7 @@ address = "2001:DB8:123:abcd::1"
 #
 # E.g. given "some_address" would be resolved to fd84:d40e:6a1b:f004:4bcf:78ff:feac:8bd9 then this entry would resolve
 # to 2001:DB8:123:abcd:4bcf:78ff:feac:8bd9.
-[ip_address.calculated_address]
+[ip.calculated_address]
 type = "derived"
 subnet_bits = 64
 subnet_entry = "otherAddress"
@@ -52,7 +51,7 @@ host_entry = "some_address"
 
 # Each [[ddns_entry]] section configures a Dynamic DNS entry that should be updated. Updates are HTTP requests to an URL
 # that is configured with the "url" option. The URL can contain placeholder in the form of "{<identifier>}" where
-# <identifier> must be the identifier of one of the IP addresses sources configured in an "[ip_address]" section. These
+# <identifier> must be the identifier of one of the IP addresses sources configured in an "[ip.*]" section. These
 # placeholders will be replaced with the current IP addresse of the source on update.
 # If update reqiuieres authentication credentials can be configured with the "username" and "password" options.
 

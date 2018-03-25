@@ -13,7 +13,7 @@ pub struct Config {
     #[serde(rename = "ddns_entry")]
     pub ddns_entries: Vec<DdnsEntry>,
     #[serde(default)]
-    #[serde(rename = "ip_address")]
+    #[serde(rename = "ip")]
     pub ip_addresses: HashMap<String, IpAddress>,
 }
 
@@ -91,15 +91,15 @@ mod tests {
         password = "a_password"
         port = 3001
 
-        [ip_address.addr1]
+        [ip.addr1]
         type = "parameter"
         parameter = "addr1"
 
-        [ip_address.some_static_addr]
+        [ip.some_static_addr]
         type = "static"
         address = "2001:DB8:123:abcd::1"
 
-        [ip_address.calculated_address]
+        [ip.calculated_address]
         type = "derived"
         subnet_bits = 64
         subnet_entry = "addr1"
