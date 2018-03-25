@@ -11,7 +11,8 @@ extern crate regex;
 #[macro_use]
 extern crate lazy_static;
 
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 extern crate simplelog;
 
 mod server;
@@ -25,17 +26,13 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::net::IpAddr;
 
-use simplelog::{TermLogger, LevelFilter, Config as SimpleLogConfig};
+use simplelog::{SimpleLogger, TermLogger, CombinedLogger, LevelFilter, Config as SimpleLogConfig};
 
 use config::Config;
 use updater::DdnsUpdater;
 
 fn main() {
-    let logger = TermLogger::init(LevelFilter::Info, SimpleLogConfig::default());
-    if logger.is_err() {
-        eprintln!("{}", logger.unwrap_err());
-        return;
-    }
+    init_logging();
 
     let config_file = get_config_file();
     if config_file.is_err() {
@@ -52,6 +49,18 @@ fn main() {
     let s = server::Server::new(do_update, config.server.clone(), config);
     info!("Listening on port {}", s.http_port());
     s.start_server();
+}
+
+fn init_logging() {
+    let term_logger = TermLogger::new(LevelFilter::Info, SimpleLogConfig::default());
+    let logger = if term_logger.is_some() {
+        CombinedLogger::init(vec![term_logger.unwrap()])
+    } else {
+        SimpleLogger::init(LevelFilter::Info, SimpleLogConfig::default())
+    };
+    if logger.is_err() {
+        eprintln!("Failed to initialize logging framework. Nothing will be logged. Error was: {}", logger.unwrap_err());
+    }
 }
 
 fn get_config_file() -> Result<PathBuf, ()> {
@@ -89,10 +98,10 @@ fn do_update(config: &Config, addresses: &HashMap<String, IpAddr>) -> Result<(),
                 let result = updater.update_dns(resolved);
                 match result {
                     Ok(_) => info!("Successfully updated DDNS entry {}", resolved),
-                    Err(e) => handle_error_while_updating(&mut error, resolved, & e)
+                    Err(e) => handle_error_while_updating(&mut error, resolved, &e)
                 }
             }
-            Err(ref e) => handle_error_while_updating(&mut error, e, & e.message)
+            Err(ref e) => handle_error_while_updating(&mut error, e, &e.message)
         }
     }
     if error.is_empty() {
