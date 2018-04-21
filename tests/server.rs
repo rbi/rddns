@@ -25,4 +25,5 @@ fn prints_to_console_on_request() {
 
     assert!(rddns.stdout_readln().ends_with("Listening on port 3092\n"));
     assert!(rddns.stdout_readln().ends_with("updating DDNS entries\n"));
+    assert!(rddns.is_running().unwrap());
 }

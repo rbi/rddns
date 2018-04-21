@@ -12,13 +12,21 @@
 # "[ip.<identifier>]" where <identifier> must be replaced with a unique key that is later used to reference this entry.
 # There are different types of sources for "ip" entries. The type is configured with the "type" option.
 
-# IP address sources of type "parameter" take the current IP address from a HTTP query parameter that is passed to the
-# rddns HTTP server. The current IP address must be passed via a query parameter of the form "ip[<parameter>]" where
-# <parameter> is the name of the  parameter that is configured with the "parameter" option.
+# IP address sources of type "parameter" take the current IP address from parameters passed when triggerering an update.
+#
+# In server mode these parameters must be passed as HTTP query parameter to the rddns HTTP server. They must be passed
+# in the form "ip[<parameter>]=<address>" where <parameter> is the name of the  parameter that is configured with the
+# "parameter" option and <address> is the current address.
+#
+# In update mode these parameters musst be passed as command line arguments. They must have the form of
+# "--ip <parameter>=<address>" whith <parameter> and <address> having the same semantics as in server mode.
 #
 # The following example configures an IP address source identified by "some_address" that takes IP addresses from the
-# HTTP query parameter "ip[my_parameter]". An appropriate HTTP request to the rddns server would be
+# parameter "my_parameter".
+# An appropriate HTTP request to the rddns server would be
 # http://rddns-server:3092?ip[my_parameter]=203.0.113.19
+# In update mode an appropriate command line would be
+# rddns -c example_config.toml update --ip my_parameter=203.0.113.19
 [ip.some_address]
 type = "parameter"
 parameter = "my_parameter"

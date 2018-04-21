@@ -27,6 +27,7 @@ mod updater;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::net::IpAddr;
+use std::process::exit;
 
 use simplelog::{SimpleLogger, TermLogger, CombinedLogger, LevelFilter, Config as SimpleLogConfig};
 
@@ -42,7 +43,7 @@ fn main() {
     let config_or_error = config::read_config(&cmd_args.config_file);
     if config_or_error.is_err() {
         error!("{}", config_or_error.unwrap_err());
-        return;
+        exit(1);
     }
     let config = config_or_error.unwrap();
 
@@ -52,8 +53,10 @@ fn main() {
             s.start_server();
         },
         ExecutionMode::UPDATE => {
-            error!("Command \"update\" is not implemented yet.");
-            return;
+            match do_update(&config, &cmd_args.addresses) {
+                Ok(_) => exit(0),
+                Err(_) => exit(1),
+            }
         }
     }
 

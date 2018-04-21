@@ -1,5 +1,5 @@
 use std::env;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Result};
 use std::process::{Child, ChildStdout, Command, Stdio};
 use std::{thread, time};
 use std::path::PathBuf;
@@ -16,7 +16,7 @@ impl RddnsProcess {
     /// Starts a new rddns process.
     ///
     /// * `command` -  The rddns sub-command that should be executed.
-    pub fn new(command : &str) -> RddnsProcess {
+    pub fn new(command: &str) -> RddnsProcess {
         let executable = target_dir().join("rddns");
         let example_config = rddns_driver_src_dir().join("empty_config.toml");
 
@@ -51,9 +51,19 @@ impl RddnsProcess {
         buffer
     }
 
-    fn stop(&mut self) {
-        self.process.kill().expect("Stopping rrdns process should work.");
-        self.process.wait().unwrap();
+    pub fn is_running(&mut self) -> Result<bool> {
+        match self.process.try_wait()? {
+            Some(_) => Ok(false),
+            None => Ok(true)
+        }
+    }
+
+    fn stop(&mut self) -> Result<()> {
+        if self.is_running()? {
+            self.process.kill()?
+        }
+        self.process.wait()?;
+        Ok(())
     }
 
     fn wait_for_start(&self) {
@@ -64,7 +74,7 @@ impl RddnsProcess {
 
 impl Drop for RddnsProcess {
     fn drop(&mut self) {
-        self.stop();
+        self.stop().unwrap();
     }
 }
 
