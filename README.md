@@ -14,7 +14,7 @@ Updates are triggered by HTTP calls to the HTTP server embedded in rddns.
 # Usage
 Rddns is started by passing a configuration file as parameter.
 
-    rddns /path/to/config.toml
+    rddns -c /path/to/config.toml server
 
 The configuration file contains the DynDNS entries that should be updated as well as all other configurable options.
 It is described in the exemplary configuration file [example_config.toml](example_config.toml).

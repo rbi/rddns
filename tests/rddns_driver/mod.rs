@@ -14,12 +14,16 @@ pub struct RddnsProcess {
 /// The process will be stoped when [RddnsProcess] goes ot of scope.
 impl RddnsProcess {
     /// Starts a new rddns process.
-    pub fn new() -> RddnsProcess {
+    ///
+    /// * `command` -  The rddns sub-command that should be executed.
+    pub fn new(command : &str) -> RddnsProcess {
         let executable = target_dir().join("rddns");
         let example_config = rddns_driver_src_dir().join("empty_config.toml");
 
         let mut process = Command::new(executable)
+            .arg("-c")
             .arg(example_config)
+            .arg(command)
             .stdout(Stdio::piped())
             .spawn()
             .expect("Spawning the rrdns process should work");

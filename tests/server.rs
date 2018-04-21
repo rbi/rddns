@@ -14,7 +14,7 @@ fn prints_to_console_on_request() {
     // setup
     let mut core = Core::new().unwrap();
     let client = Client::new(&core.handle());
-    let mut rddns = RddnsProcess::new();
+    let mut rddns = RddnsProcess::new("server");
 
     // test
     let uri = rddns.get_url().parse().unwrap();

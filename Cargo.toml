@@ -15,6 +15,7 @@ regex = "0.2"
 lazy_static = "1.0.0"
 log = "0.4.0"
 simplelog = "0.5.1"
+clap = "2.31.2"
 
 [dev-dependencies]
 tempdir = "0.3.5"

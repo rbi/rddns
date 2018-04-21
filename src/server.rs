@@ -40,11 +40,8 @@ impl<T: Clone + 'static> Server<T> {
             user_data: self.user_data.clone(),
         };
         let server = Http::new().bind(&addr, service_creator).unwrap();
+        info!("Listening on port {}", self.port);
         server.run().unwrap();
-    }
-
-    pub fn http_port(&self) -> u16 {
-        self.port
     }
 }
 

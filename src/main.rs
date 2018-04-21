@@ -15,13 +15,15 @@ extern crate lazy_static;
 extern crate log;
 extern crate simplelog;
 
+#[macro_use]
+extern crate clap;
+
+mod command_line;
 mod server;
 mod config;
 mod resolver;
 mod updater;
 
-use std::env;
-use std::path::PathBuf;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::net::IpAddr;
@@ -30,25 +32,31 @@ use simplelog::{SimpleLogger, TermLogger, CombinedLogger, LevelFilter, Config as
 
 use config::Config;
 use updater::DdnsUpdater;
+use command_line::{ExecutionMode, parse_command_line};
 
 fn main() {
     init_logging();
 
-    let config_file = get_config_file();
-    if config_file.is_err() {
-        return;
-    }
+    let cmd_args = parse_command_line();
 
-    let config_or_error = config::read_config(&config_file.unwrap());
+    let config_or_error = config::read_config(&cmd_args.config_file);
     if config_or_error.is_err() {
         error!("{}", config_or_error.unwrap_err());
         return;
     }
     let config = config_or_error.unwrap();
 
-    let s = server::Server::new(do_update, config.server.clone(), config);
-    info!("Listening on port {}", s.http_port());
-    s.start_server();
+    match cmd_args.execution_mode {
+        ExecutionMode::SERVER => {
+            let s = server::Server::new(do_update, config.server.clone(), config);
+            s.start_server();
+        },
+        ExecutionMode::UPDATE => {
+            error!("Command \"update\" is not implemented yet.");
+            return;
+        }
+    }
+
 }
 
 fn init_logging() {
@@ -61,27 +69,6 @@ fn init_logging() {
     if logger.is_err() {
         eprintln!("Failed to initialize logging framework. Nothing will be logged. Error was: {}", logger.unwrap_err());
     }
-}
-
-fn get_config_file() -> Result<PathBuf, ()> {
-    let mut args = env::args();
-    let executable = args.next().unwrap_or("rddns".to_string());
-
-    let usage = format!("Usage: {} [config-file]", executable);
-    let path_string = args.next();
-    if path_string.is_none() {
-        error!("No configuration file was specified.");
-        info!("{}", usage);
-        return Err(());
-    }
-    let path = PathBuf::from(path_string.unwrap());
-    if !path.is_file() {
-        error!("\"{}\" is not a valid path to a config file.", path.to_str().unwrap());
-        info!("{}", usage);
-        return Err(());
-    }
-
-    Ok(path)
 }
 
 fn do_update(config: &Config, addresses: &HashMap<String, IpAddr>) -> Result<(), String> {
