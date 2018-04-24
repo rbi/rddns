@@ -88,10 +88,10 @@ fn do_update(config: &Config, addresses: &HashMap<String, IpAddr>) -> Result<(),
                 let result = updater.update_dns(resolved);
                 match result {
                     Ok(_) => info!("Successfully updated DDNS entry {}", resolved),
-                    Err(e) => handle_error_while_updating(&mut error, resolved, &e)
+                    Err(e) => handle_error_while_updating(&mut error, resolved, &e, !resolved.original.ignore_error)
                 }
             }
-            Err(ref e) => handle_error_while_updating(&mut error, e, &e.message)
+            Err(ref e) => handle_error_while_updating(&mut error, e, &e.message, true)
         }
     }
     if error.is_empty() {
@@ -101,9 +101,11 @@ fn do_update(config: &Config, addresses: &HashMap<String, IpAddr>) -> Result<(),
     }
 }
 
-fn handle_error_while_updating(error: &mut String, entity: &Display, message: &String) {
+fn handle_error_while_updating(error: &mut String, entity: &Display, message: &String, return_error: bool) {
     let error_text = format!("Updating DDNS \"{}\" failed. Reason: {}", entity, message);
     error!("{}", error_text);
-    error.push_str(&error_text);
-    error.push('\n');
+    if return_error {
+        error.push_str(&error_text);
+        error.push('\n');
+    }
 }

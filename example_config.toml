@@ -62,12 +62,16 @@ host_entry = "some_address"
 # <identifier> must be the identifier of one of the IP addresses sources configured in an "[ip.*]" section. These
 # placeholders will be replaced with the current IP addresse of the source on update.
 # If update reqiuieres authentication credentials can be configured with the "username" and "password" options.
-
+#
 # The following entry is an example how to update an entry at the Hurrican Electric dynamic DNS service.
 [[ddns_entry]]
 url = "https://dyn.dns.he.net/nic/update?hostname=update.example.com?&myip={some_address}"
 username = "update.example.com"
 password = "secret"
+# When executing updates rddns returns appropriate HTTP error codes or command exit code when updating an entry failed.
+# Setting the following to true will ignore failures of this entry when calculating the code to return to the user.
+# If missing this defaults to "false".
+ignore_error = true
 
 # The following example demonstrates an update at a service that does not require credentials. The URL that is called
 # would be resolved to "http://example.com/dynupdate/2001:DB8:123:abcd::1?doUpdate=true" as "otherAddress" is configured

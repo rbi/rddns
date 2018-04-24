@@ -39,6 +39,8 @@ pub struct DdnsEntry {
     pub url: String,
     pub username: Option<String>,
     pub password: Option<String>,
+    #[serde(default = "get_false")]
+    pub ignore_error: bool
 }
 
 impl Display for DdnsEntry {
@@ -72,6 +74,8 @@ pub fn read_config(config_file: &Path) -> Result<Config, Error> {
     file.read_to_string(&mut contents)?;
     ::toml::from_str(&contents).map_err(|e| Error::new(ErrorKind::InvalidData, format!("{}", e)))
 }
+
+fn get_false() -> bool {false}
 
 #[cfg(test)]
 mod tests {
@@ -109,6 +113,7 @@ mod tests {
         url = "http://example.com/{addr1}"
         username = "someUser"
         password = "somePassword"
+        ignore_error = true
 
         [[ddns_entry]]
         url = "https://other.org/x?y={some_static_addr}"
@@ -140,11 +145,13 @@ mod tests {
                     url: "http://example.com/{addr1}".to_string(),
                     username: Some("someUser".to_string()),
                     password: Some("somePassword".to_string()),
+                    ignore_error: true,
                 },
                 DdnsEntry {
                     url: "https://other.org/x?y={some_static_addr}".to_string(),
                     username: None,
                     password: None,
+                    ignore_error: false,
                 }
             ],
         };

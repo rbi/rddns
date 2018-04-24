@@ -28,11 +28,11 @@ impl DdnsUpdater {
         let uri = ddns_entry.url.parse().unwrap();
 
         let mut request = Request::new(Method::Get, uri);
-        ddns_entry.username.clone().map(|username| {
+        ddns_entry.original.username.clone().map(|username| {
             let auth = Authorization(
                 Basic {
                     username: username,
-                    password: ddns_entry.password.clone(),
+                    password: ddns_entry.original.password.clone(),
                 }
             );
             request.headers_mut().set(auth);
