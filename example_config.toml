@@ -29,6 +29,8 @@
 # rddns -c example_config.toml update --ip my_parameter=203.0.113.19
 [ip.some_address]
 type = "parameter"
+# The for name of the parameter. This is optional. If it is missing the name of the parameter is the same as the
+# identifier.
 parameter = "my_parameter"
 
 # IP address sources of type "static" use a fixed IP address that is configured with the option "address".

@@ -54,7 +54,7 @@ impl Display for DdnsEntry {
 pub enum IpAddress {
     #[serde(rename = "parameter")]
     FromParameter {
-        parameter: String,
+        parameter: Option<String>,
     },
     #[serde(rename = "static")]
     Static {

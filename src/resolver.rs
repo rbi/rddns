@@ -75,7 +75,8 @@ fn resolve_addresses<'a>(address_defs: &'a HashMap<String, IpAddress>,
     for (name, def) in address_defs {
         match match def {
             &IpAddress::Static { ref address } => Some(address.clone()),
-            &IpAddress::FromParameter { ref parameter } => address_actual.get(parameter).cloned(),
+            &IpAddress::FromParameter { ref parameter } => address_actual.
+                get(parameter.as_ref().unwrap_or(&name.to_string())).cloned(),
             &IpAddress::Derived { .. } => None
         } {
             Some(address) => resolved.insert(name, address),
