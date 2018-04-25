@@ -123,7 +123,7 @@ mod tests {
 
         let mut ip_addresses = HashMap::new();
         ip_addresses.insert("addr1".to_string(), IpAddress::FromParameter {
-            parameter: "addr1".to_string()
+            parameter: Some("addr1".to_string())
         });
         ip_addresses.insert("some_static_addr".to_string(), IpAddress::Static {
             address: "2001:DB8:123:abcd::1".parse().unwrap(),

@@ -245,10 +245,10 @@ mod tests {
     fn resolve_handles_parametrized_addresses() {
         let mut address_defs = HashMap::new();
         address_defs.insert("ip1".to_string(), IpAddress::FromParameter {
-            parameter: "ip1".to_string()
+            parameter: None,
         });
         address_defs.insert("other_ip".to_string(), IpAddress::FromParameter {
-            parameter: "different_parameter".to_string()
+            parameter: Some("different_parameter".to_string())
         });
         let mut address_values = HashMap::new();
         address_values.insert("ip1".to_string(), "203.0.113.39".parse().unwrap());
@@ -272,10 +272,10 @@ mod tests {
         let mut address_defs = some_static_address_defs();
         // Replace some definitions with "from parameter" definitions.
         address_defs.insert("host_ip1".to_string(), IpAddress::FromParameter {
-            parameter: "host_ip1_parameter".to_string()
+            parameter: Some("host_ip1_parameter".to_string())
         });
         address_defs.insert("net_ip2".to_string(), IpAddress::FromParameter {
-            parameter: "net_ip2_parameter".to_string()
+            parameter: Some("net_ip2_parameter".to_string())
         });
         address_defs.insert("ip1".to_string(), IpAddress::Derived {
             subnet_bits: 24,
@@ -447,7 +447,7 @@ mod tests {
     fn resolve_produces_failed_entry_when_no_address_def_for_placeholder_is_available() {
         let mut address_defs = HashMap::new();
         address_defs.insert("other_ip".to_string(), IpAddress::FromParameter {
-            parameter: "different_parameter".to_string()
+            parameter: Some("different_parameter".to_string())
         });
         let mut address_values = HashMap::new();
         address_values.insert("different_parameter".to_string(), "2001:DB8:a2f3::29".parse().unwrap());
@@ -465,10 +465,10 @@ mod tests {
     fn resolve_produces_failed_entry_when_no_address_for_address_def_is_available() {
         let mut address_defs = HashMap::new();
         address_defs.insert("ip1".to_string(), IpAddress::FromParameter {
-            parameter: "ip1".to_string()
+            parameter: None
         });
         address_defs.insert("other_ip".to_string(), IpAddress::FromParameter {
-            parameter: "different_parameter".to_string()
+            parameter: Some("different_parameter".to_string())
         });
         let mut address_values = HashMap::new();
         address_values.insert("ip1".to_string(), "203.0.113.39".parse().unwrap());
