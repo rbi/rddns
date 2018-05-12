@@ -74,10 +74,10 @@ fn resolve_addresses<'a>(address_defs: &'a HashMap<String, IpAddress>,
 
     for (name, def) in address_defs {
         match match def {
-            &IpAddress::Static { ref address } => Some(address.clone()),
-            &IpAddress::FromParameter { ref parameter } => address_actual.
+            IpAddress::Static { address } => Some(address.clone()),
+            IpAddress::FromParameter { parameter } => address_actual.
                 get(parameter.as_ref().unwrap_or(&name.to_string())).cloned(),
-            &IpAddress::Derived { .. } => None
+            IpAddress::Derived { .. } => None
         } {
             Some(address) => resolved.insert(name, address),
             _ => None
@@ -91,8 +91,8 @@ fn resolve_addresses<'a>(address_defs: &'a HashMap<String, IpAddress>,
     for _i in 1..1000 {
         for (name, def) in address_defs {
             match match def {
-                &IpAddress::Derived { subnet_bits, ref host_entry, ref subnet_entry } =>
-                    resolve_derived(resolved.get(subnet_entry), resolved.get(host_entry), subnet_bits),
+                IpAddress::Derived { subnet_bits, host_entry, subnet_entry } =>
+                    resolve_derived(resolved.get(subnet_entry), resolved.get(host_entry), *subnet_bits),
                 _ => None
             } {
                 Some(address) => resolved.insert(name, address),
@@ -113,20 +113,20 @@ fn resolve_derived(net_address: Option<&IpAddr>, host_address: Option<&IpAddr>, 
         return None;
     }
     match net_address.unwrap() {
-        &IpAddr::V4(ref net_addr) => {
+        IpAddr::V4(net_addr) => {
             match host_address.unwrap() {
-                &IpAddr::V4(ref host_addr) => resolve_derived_ipv4(net_addr, host_addr, subnet_bits),
-                &IpAddr::V6(ref host_addr) => {
+                IpAddr::V4(host_addr) => resolve_derived_ipv4(net_addr, host_addr, subnet_bits),
+                IpAddr::V6(host_addr) => {
                     warn!("Failed to resolve a derived IP address for host_address \"{}\" and net_address \"{}\". \
                            The first is an IPv6 address and the second an IPv4 address.", host_addr, net_addr);
                     None
                 }
             }
         }
-        &IpAddr::V6(ref net_addr) => {
+        IpAddr::V6(net_addr) => {
             match host_address.unwrap() {
-                &IpAddr::V6(ref host_addr) => resolve_derived_ipv6(net_addr, host_addr, subnet_bits),
-                &IpAddr::V4(ref host_addr) => {
+                IpAddr::V6(host_addr) => resolve_derived_ipv6(net_addr, host_addr, subnet_bits),
+                IpAddr::V4(host_addr) => {
                     warn!("Failed to resolve a derived IP address for host_address \"{}\" and net_address \"{}\". \
                            The first is an IPv4 address and the second an IPv6 address.", host_addr, net_addr);
                     None

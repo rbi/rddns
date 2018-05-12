@@ -110,7 +110,7 @@ fn check_authorisation(headers: &Headers, config: &ServerConfig) -> Result<(), (
         Some(ref username) => {
             let auth_header: Option<&Authorization<Basic>> = headers.get();
             match auth_header {
-                Some(ref auth) =>
+                Some(auth) =>
                     if auth.username.eq(username) && match config.password {
                         Some(ref config_password) => match auth.password {
                             Some(ref auth_password) => config_password.eq(auth_password),
