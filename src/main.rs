@@ -27,7 +27,6 @@ mod updater;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::net::IpAddr;
-use std::process::exit;
 
 use simplelog::{SimpleLogger, TermLogger, CombinedLogger, LevelFilter, Config as SimpleLogConfig};
 
@@ -35,31 +34,24 @@ use config::Config;
 use updater::DdnsUpdater;
 use command_line::{ExecutionMode, parse_command_line};
 
-fn main() {
+fn main() -> Result<(), String>{
     init_logging();
 
     let cmd_args = parse_command_line();
 
-    let config_or_error = config::read_config(&cmd_args.config_file);
-    if config_or_error.is_err() {
-        error!("{}", config_or_error.unwrap_err());
-        exit(1);
-    }
-    let config = config_or_error.unwrap();
+    let config = config::read_config(&cmd_args.config_file).map_err(|err| err.to_string())?;
 
     match cmd_args.execution_mode {
         ExecutionMode::SERVER => {
             let s = server::Server::new(do_update, config.server.clone(), config);
-            s.start_server();
+            s.start_server()
         },
         ExecutionMode::UPDATE => {
-            match do_update(&config, &cmd_args.addresses) {
-                Ok(_) => exit(0),
-                Err(_) => exit(1),
-            }
+            do_update(&config, &cmd_args.addresses)
+                // error was already logged
+                .map_err(|_err| String::new())
         }
     }
-
 }
 
 fn init_logging() {

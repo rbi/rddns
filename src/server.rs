@@ -6,7 +6,7 @@ use hyper::StatusCode;
 use hyper::server::{Http, Request, Response, Service, NewService};
 use hyper::header::{Authorization, Basic, Headers};
 use regex::Regex;
-use std::net::IpAddr;
+use std::net::{AddrParseError, IpAddr};
 
 use config::Server as ServerConfig;
 
@@ -32,16 +32,16 @@ impl<T: Clone + 'static> Server<T> {
         }
     }
 
-    pub fn start_server(&self) {
-        let addr = format!("[::]:{}", self.port).parse().unwrap();
+    pub fn start_server(&self) -> Result<(), String> {
+        let addr = format!("[::]:{}", self.port).parse().map_err(|err: AddrParseError| err.to_string())?;
         let service_creator: ServiceCreator<T> = ServiceCreator {
             update_callback: self.update_callback,
             server_config: self.server_config.clone(),
             user_data: self.user_data.clone(),
         };
-        let server = Http::new().bind(&addr, service_creator).unwrap();
+        let server = Http::new().bind(&addr, service_creator).map_err(|err| err.to_string())?;
         info!("Listening on port {}", self.port);
-        server.run().unwrap();
+        server.run().map_err(|err| err.to_string())
     }
 }
 
