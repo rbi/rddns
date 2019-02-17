@@ -1,21 +1,22 @@
 [package]
 name = "rddns"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Raik Bieniek <dev@voidnode.de>"]
 
 [dependencies]
-hyper = "0.11.2"
-hyper-tls = "0.1.2"
-futures = "0.1.17"
-tokio-core = "0.1.11"
-toml = "0.4.5"
-serde = "1.0.27"
-serde_derive = "1.0.27"
-regex = "0.2"
-lazy_static = "1.0.0"
-log = "0.4.0"
-simplelog = "0.5.1"
-clap = "2.31.2"
+hyper = "0.12.23"
+hyper-tls = "0.3.1"
+futures = "0.1.25"
+tokio = "0.1.15"
+toml = "0.4.10"
+serde = "1.0.84"
+serde_derive = "1.0.84"
+regex = "1.1.0"
+lazy_static = "1.2.0"
+log = "0.4.6"
+simplelog = "0.5.3"
+clap = "2.32.0"
+base64 = "0.10.0"
 
 [dev-dependencies]
-tempdir = "0.3.5"
+tempdir = "0.3.7"

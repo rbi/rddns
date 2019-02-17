@@ -1,8 +1,8 @@
-extern crate tokio_core;
-#[macro_use]
+extern crate tokio;
 extern crate hyper;
 extern crate hyper_tls;
 extern crate futures;
+extern crate base64;
 
 #[macro_use]
 extern crate serde_derive;
@@ -23,15 +23,19 @@ mod server;
 mod config;
 mod resolver;
 mod updater;
+mod basic_auth_header;
 
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::net::IpAddr;
 
+use tokio::runtime::Runtime;
+use futures::future::{lazy, result};
+
 use simplelog::{SimpleLogger, TermLogger, CombinedLogger, LevelFilter, Config as SimpleLogConfig};
 
 use config::Config;
-use updater::DdnsUpdater;
+use updater::update_dns;
 use command_line::{ExecutionMode, parse_command_line};
 
 fn main() -> Result<(), String>{
@@ -43,13 +47,14 @@ fn main() -> Result<(), String>{
 
     match cmd_args.execution_mode {
         ExecutionMode::SERVER => {
-            let s = server::Server::new(do_update, config.server.clone(), config);
-            s.start_server()
+            server::start_server(do_update, config.server.clone(), config)
         },
         ExecutionMode::UPDATE => {
+            let mut rt = Runtime::new().unwrap();
+            rt.block_on(lazy(move ||result(
             do_update(&config, &cmd_args.addresses)
                 // error was already logged
-                .map_err(|_err| String::new())
+                .map_err(|_err| String::new()))))
         }
     }
 }
@@ -70,14 +75,12 @@ fn do_update(config: &Config, addresses: &HashMap<String, IpAddr>) -> Result<(),
     info!("updating DDNS entries");
 
     let resolved_entries = resolver::resolve_config(config, addresses);
-
-    let mut updater = DdnsUpdater::new();
     let mut error = String::new();
 
     for entry in resolved_entries {
         match entry {
             Ok(ref resolved) => {
-                let result = updater.update_dns(resolved);
+                let result = update_dns(resolved);
                 match result {
                     Ok(_) => info!("Successfully updated DDNS entry {}", resolved),
                     Err(e) => handle_error_while_updating(&mut error, resolved, &e, !resolved.original.ignore_error)
