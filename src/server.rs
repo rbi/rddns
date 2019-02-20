@@ -1,55 +1,77 @@
 use std::collections::HashMap;
-use futures::future::Future;
+use futures::future::{ok, err, result, Future, FutureResult, IntoFuture};
 use hyper;
 use hyper::StatusCode;
-use hyper::{Response, Body};
-use hyper::service::service_fn_ok;
+use hyper::{Request, Response, Body};
+use hyper::service::{Service, service_fn, make_service_fn, MakeService};
 use hyper::header::{HeaderMap, WWW_AUTHENTICATE, AUTHORIZATION};
+use hyper::body::Payload;
 use regex::Regex;
 use std::net::{AddrParseError, IpAddr};
-use tokio::runtime::Runtime;
 
 use config::Server as ServerConfig;
 use basic_auth_header::BasicAuth;
 
-pub fn start_server<T: Clone + Send + Sync + 'static>(update_callback: fn(&T, &HashMap<String, IpAddr>) -> Result<(), String>,
-                                                      server_config: ServerConfig, user_data: T) -> Result<(), String> {
+pub fn create_server<T: Clone + Send + Sync + 'static>(update_callback: fn(&T, &HashMap<String, IpAddr>) -> Result<(), String>,
+                                                       server_config: ServerConfig, user_data: T) -> Box<Future<Item=(), Error=String> + Send> {
     let port = server_config.port.unwrap_or(3092);
-    let addr = format!("[::]:{}", port).parse().map_err(|err: AddrParseError| err.to_string())?;
+    match format!("[::]:{}", port).parse().map_err(|err: AddrParseError| err.to_string()) {
+        Ok(addr) => {
+            let service_creator = move || {
+                let user_data = user_data.clone();
+                let server_config = server_config.clone();
+                let service: FutureResult<RequestHandler<T>, hyper::Error> = ok(RequestHandler {
+                    update_callback,
+                    server_config: server_config.clone(),
+                    user_data: user_data.clone(),
+                });
+                service
+            };
 
-    let service_creator = move || {
-        let user_data = user_data.clone();
-        let server_config = server_config.clone();
-        service_fn_ok(move |req| {
-            let authorized = check_authorisation(req.headers(), &server_config);
-            let mut response = Response::builder();
-            match authorized {
-                Ok(_) => {
-                    let ip_parameters = extract_address_parameters(&req.uri().query());
-                    let update_result = (update_callback)(&user_data, &ip_parameters);
-                    let return_code = match update_result {
-                        Ok(_) => StatusCode::OK,
-                        Err(_) => StatusCode::BAD_GATEWAY
-                    };
-                    let message = match update_result {
-                        Ok(_) => "success".to_string(),
-                        Err(err) => err
-                    };
-                    response.status(return_code).body(Body::from(message))
-                }
-                Err(_) => {
-                    response.status(StatusCode::UNAUTHORIZED).header(WWW_AUTHENTICATE, "Basic realm=\"rddns\"")
-                        .body(Body::empty())
-                }
-            }.unwrap()
-        })
-    };
+            info!("Listening on port {}", port);
+            Box::new(hyper::Server::bind(&addr).serve(service_creator).map_err(|err| err.to_string()))
+        }
+        Err(_) => Box::new(err("Failed to parse address.".to_owned()))
+    }
+}
 
-    let server = hyper::Server::bind(&addr).serve(service_creator)
-        .map_err(|err| err.to_string());
-    info!("Listening on port {}", port);
-    let mut rt = Runtime::new().unwrap();
-    rt.block_on(server)
+struct RequestHandler<T> {
+    update_callback: fn(&T, &HashMap<String, IpAddr>) -> Result<(), String>,
+    server_config: ServerConfig,
+    user_data: T,
+}
+
+impl<T: Clone + Send + Sync + 'static> Service for RequestHandler<T> {
+    type ReqBody = hyper::Body;
+    type ResBody = hyper::Body;
+    type Error = hyper::http::Error;
+    //    type Future = hyper::client::ResponseFuture;
+    type Future = Box<Future<Item=Response<Body>, Error=Self::Error> + Send>;
+
+    fn call(&mut self, req: Request<Self::ReqBody>) -> Self::Future {
+        let authorized = check_authorisation(req.headers(), &self.server_config);
+        let mut response = Response::builder();
+        Box::new(result(match authorized {
+            Ok(_) => {
+                let ip_parameters = extract_address_parameters(&req.uri().query());
+                let update_result = (self.update_callback)(&self.user_data, &ip_parameters);
+                let return_code = match update_result {
+                    Ok(_) => StatusCode::OK,
+                    Err(_) => StatusCode::BAD_GATEWAY
+                };
+                let message = match update_result {
+                    Ok(_) => "success".to_string(),
+                    Err(err) => err
+                };
+
+                response.status(return_code).body(Body::from(message))
+            }
+            Err(_) => {
+                response.status(StatusCode::UNAUTHORIZED).header(WWW_AUTHENTICATE, "Basic realm=\"rddns\"")
+                    .body(Body::empty())
+            }
+        }))
+    }
 }
 
 fn check_authorisation(headers: &HeaderMap, config: &ServerConfig) -> Result<(), ()> {

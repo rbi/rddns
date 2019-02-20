@@ -38,25 +38,21 @@ use config::Config;
 use updater::update_dns;
 use command_line::{ExecutionMode, parse_command_line};
 
-fn main() -> Result<(), String>{
+fn main() -> Result<(), String> {
     init_logging();
 
     let cmd_args = parse_command_line();
 
     let config = config::read_config(&cmd_args.config_file).map_err(|err| err.to_string())?;
 
-    match cmd_args.execution_mode {
-        ExecutionMode::SERVER => {
-            server::start_server(do_update, config.server.clone(), config)
-        },
-        ExecutionMode::UPDATE => {
-            let mut rt = Runtime::new().unwrap();
-            rt.block_on(lazy(move ||result(
-            do_update(&config, &cmd_args.addresses)
-                // error was already logged
-                .map_err(|_err| String::new()))))
-        }
-    }
+    let work = match cmd_args.execution_mode {
+        ExecutionMode::SERVER => server::create_server(do_update, config.server.clone(), config),
+        ExecutionMode::UPDATE => Box::new(lazy(move || result(do_update(&config, &cmd_args.addresses)
+            // error was already logged
+            .map_err(|_err| String::new()))))
+    };
+    let mut rt = Runtime::new().unwrap();
+    rt.block_on(work)
 }
 
 fn init_logging() {
