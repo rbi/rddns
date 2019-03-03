@@ -7,17 +7,8 @@ use resolver::ResolvedDdnsEntry;
 use basic_auth_header::{to_auth_header_value, to_auth_header_value_no_password};
 
 
-pub fn update_dns(ddns_entry: &ResolvedDdnsEntry) -> Result<(), String> {
-    let uri = ddns_entry.url.parse().unwrap();
-
-    let request = execute_request(uri, ddns_entry);
-    hyper::rt::spawn(request.map_err(|_| ()));
-    // FIXME temporally ignoring the results of the request to get it working at all.
-    Ok(())
-}
-
-
-fn execute_request(uri: Uri, ddns_entry: &ResolvedDdnsEntry) -> impl Future<Item=(), Error=String> {
+pub fn update_dns(ddns_entry: &ResolvedDdnsEntry) -> impl Future<Item=(), Error=String> {
+    let uri: Uri = ddns_entry.url.parse().unwrap();
     let https_connector = HttpsConnector::new(4).unwrap();
     let client = Client::builder().build(https_connector);
 

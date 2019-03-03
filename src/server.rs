@@ -1,26 +1,27 @@
 use std::collections::HashMap;
-use futures::future::{ok, err, result, Future, FutureResult, IntoFuture};
+use futures::future::{ok, err, result, Future, FutureResult};
 use hyper;
 use hyper::StatusCode;
 use hyper::{Request, Response, Body};
-use hyper::service::{Service, service_fn, make_service_fn, MakeService};
+use hyper::service::Service;
 use hyper::header::{HeaderMap, WWW_AUTHENTICATE, AUTHORIZATION};
-use hyper::body::Payload;
 use regex::Regex;
 use std::net::{AddrParseError, IpAddr};
 
 use config::Server as ServerConfig;
 use basic_auth_header::BasicAuth;
 
-pub fn create_server<T: Clone + Send + Sync + 'static>(update_callback: fn(&T, &HashMap<String, IpAddr>) -> Result<(), String>,
-                                                       server_config: ServerConfig, user_data: T) -> Box<Future<Item=(), Error=String> + Send> {
+pub fn create_server<T, F>(update_callback: fn(&T, &HashMap<String, IpAddr>) -> F,
+                           server_config: ServerConfig, user_data: T) -> Box<Future<Item=(), Error=String> + Send>
+    where T: Clone + Send + Sync + 'static,
+          F: Future<Item=(), Error=String> + Send + 'static {
     let port = server_config.port.unwrap_or(3092);
     match format!("[::]:{}", port).parse().map_err(|err: AddrParseError| err.to_string()) {
         Ok(addr) => {
             let service_creator = move || {
                 let user_data = user_data.clone();
                 let server_config = server_config.clone();
-                let service: FutureResult<RequestHandler<T>, hyper::Error> = ok(RequestHandler {
+                let service: FutureResult<RequestHandler<T, F>, hyper::Error> = ok(RequestHandler {
                     update_callback,
                     server_config: server_config.clone(),
                     user_data: user_data.clone(),
@@ -35,13 +36,15 @@ pub fn create_server<T: Clone + Send + Sync + 'static>(update_callback: fn(&T, &
     }
 }
 
-struct RequestHandler<T> {
-    update_callback: fn(&T, &HashMap<String, IpAddr>) -> Result<(), String>,
+struct RequestHandler<T, F> {
+    update_callback: fn(&T, &HashMap<String, IpAddr>) -> F,
     server_config: ServerConfig,
     user_data: T,
 }
 
-impl<T: Clone + Send + Sync + 'static> Service for RequestHandler<T> {
+impl<T, F> Service for RequestHandler<T, F>
+    where T: Clone + Send + Sync + 'static,
+          F: Future<Item=(), Error=String> + Send + 'static {
     type ReqBody = hyper::Body;
     type ResBody = hyper::Body;
     type Error = hyper::http::Error;
@@ -50,27 +53,25 @@ impl<T: Clone + Send + Sync + 'static> Service for RequestHandler<T> {
 
     fn call(&mut self, req: Request<Self::ReqBody>) -> Self::Future {
         let authorized = check_authorisation(req.headers(), &self.server_config);
-        let mut response = Response::builder();
-        Box::new(result(match authorized {
+        match authorized {
             Ok(_) => {
                 let ip_parameters = extract_address_parameters(&req.uri().query());
-                let update_result = (self.update_callback)(&self.user_data, &ip_parameters);
-                let return_code = match update_result {
-                    Ok(_) => StatusCode::OK,
-                    Err(_) => StatusCode::BAD_GATEWAY
-                };
-                let message = match update_result {
-                    Ok(_) => "success".to_string(),
-                    Err(err) => err
-                };
+                Box::new((self.update_callback)(&self.user_data, &ip_parameters).then(move |update_result| {
+                    let return_code = match update_result {
+                        Ok(_) => StatusCode::OK,
+                        Err(_) => StatusCode::BAD_GATEWAY
+                    };
+                    let message = match update_result {
+                        Ok(_) => "success".to_string(),
+                        Err(err) => err
+                    };
 
-                response.status(return_code).body(Body::from(message))
+                    result(Response::builder().status(return_code).body(Body::from(message)))
+                }))
             }
-            Err(_) => {
-                response.status(StatusCode::UNAUTHORIZED).header(WWW_AUTHENTICATE, "Basic realm=\"rddns\"")
-                    .body(Body::empty())
-            }
-        }))
+            Err(_) => Box::new(result(Response::builder().status(StatusCode::UNAUTHORIZED).header(WWW_AUTHENTICATE, "Basic realm=\"rddns\"")
+                .body(Body::empty())))
+        }
     }
 }
 

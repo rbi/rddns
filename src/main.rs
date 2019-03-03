@@ -26,17 +26,17 @@ mod updater;
 mod basic_auth_header;
 
 use std::collections::HashMap;
-use std::fmt::Display;
 use std::net::IpAddr;
 
 use tokio::runtime::Runtime;
-use futures::future::{lazy, result};
+use futures::future::{Future, ok, err, join_all};
 
 use simplelog::{SimpleLogger, TermLogger, CombinedLogger, LevelFilter, Config as SimpleLogConfig};
 
 use config::Config;
 use updater::update_dns;
 use command_line::{ExecutionMode, parse_command_line};
+use futures::future::result;
 
 fn main() -> Result<(), String> {
     init_logging();
@@ -45,14 +45,11 @@ fn main() -> Result<(), String> {
 
     let config = config::read_config(&cmd_args.config_file).map_err(|err| err.to_string())?;
 
-    let work = match cmd_args.execution_mode {
-        ExecutionMode::SERVER => server::create_server(do_update, config.server.clone(), config),
-        ExecutionMode::UPDATE => Box::new(lazy(move || result(do_update(&config, &cmd_args.addresses)
-            // error was already logged
-            .map_err(|_err| String::new()))))
-    };
     let mut rt = Runtime::new().unwrap();
-    rt.block_on(work)
+    match cmd_args.execution_mode {
+        ExecutionMode::SERVER => rt.block_on(server::create_server(do_update, config.server.clone(), config)),
+        ExecutionMode::UPDATE => rt.block_on(do_update(&config, &cmd_args.addresses))
+    }
 }
 
 fn init_logging() {
@@ -67,36 +64,40 @@ fn init_logging() {
     }
 }
 
-fn do_update(config: &Config, addresses: &HashMap<String, IpAddr>) -> Result<(), String> {
+fn do_update(config: &Config, addresses: &HashMap<String, IpAddr>) -> impl Future<Item=(), Error=String> + Send {
     info!("updating DDNS entries");
 
     let resolved_entries = resolver::resolve_config(config, addresses);
-    let mut error = String::new();
+    let work = resolved_entries.iter()
+        .map(|resolved| {
+            let resolved = resolved.clone();
+            result(resolved)
+                .map_err(|e| format!("Updating DDNS \"{}\" failed. Reason: {}", e, e.message))
+                .and_then(|ref resolved| {
+                    let resolved2 = resolved.clone();
+                    let resolved3 = resolved.clone();
+                    update_dns(resolved)
+                        .map(move |_| info!("Successfully updated DDNS entry {}", resolved2))
+                        .map_err(move |error_msg| format!("Updating DDNS \"{}\" failed. Reason: {}", resolved3, error_msg))
+                })
+                .then(|result|
+                    ok(match result {
+                        Ok(_) => "".to_owned(),
+                        Err(error_msg) => {
+                            error!("{}", error_msg);
+                            error_msg
+                        }
+                    })
+                )
+        })
+        .collect::<Vec<_>>();
+    join_all(work).and_then(|results| {
+        let error = results.join("\n");
 
-    for entry in resolved_entries {
-        match entry {
-            Ok(ref resolved) => {
-                let result = update_dns(resolved);
-                match result {
-                    Ok(_) => info!("Successfully updated DDNS entry {}", resolved),
-                    Err(e) => handle_error_while_updating(&mut error, resolved, &e, !resolved.original.ignore_error)
-                }
-            }
-            Err(ref e) => handle_error_while_updating(&mut error, e, &e.message, true)
+        if error.is_empty() {
+            ok(())
+        } else {
+            err(error.to_string())
         }
-    }
-    if error.is_empty() {
-        Ok(())
-    } else {
-        Err(error.to_string())
-    }
-}
-
-fn handle_error_while_updating(error: &mut String, entity: &Display, message: &String, return_error: bool) {
-    let error_text = format!("Updating DDNS \"{}\" failed. Reason: {}", entity, message);
-    error!("{}", error_text);
-    if return_error {
-        error.push_str(&error_text);
-        error.push('\n');
-    }
+    })
 }
