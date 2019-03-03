@@ -72,28 +72,17 @@ fn resolve_addresses<'a>(address_defs: &'a HashMap<String, IpAddress>,
                          address_actual: &HashMap<String, IpAddr>) -> HashMap<&'a String, IpAddr> {
     let mut resolved = HashMap::new();
 
-    for (name, def) in address_defs {
-        match match def {
-            IpAddress::Static { address } => Some(address.clone()),
-            IpAddress::FromParameter { parameter } => address_actual.
-                get(parameter.as_ref().unwrap_or(&name.to_string())).cloned(),
-            IpAddress::Derived { .. } => None
-        } {
-            Some(address) => resolved.insert(name, address),
-            _ => None
-        };
-    }
-
-    // Derived addresses need to be resolved in a second phase after other potential source
-    // addresses have been resolved. Do it in a loop to support derived addresses that reference other
-    // derived addresses.
+    // Derived addresses depend on other addresses to be resolved first. Therefore going through the entries multiple times
+    // until no more can be resolved.
     let mut last_size = 0;
     for _i in 1..1000 {
         for (name, def) in address_defs {
             match match def {
+                IpAddress::Static { address } => Some(address.clone()),
+                IpAddress::FromParameter { parameter } => address_actual.
+                    get(parameter.as_ref().unwrap_or(&name.to_string())).cloned(),
                 IpAddress::Derived { subnet_bits, host_entry, subnet_entry } =>
                     resolve_derived(resolved.get(subnet_entry), resolved.get(host_entry), *subnet_bits),
-                _ => None
             } {
                 Some(address) => resolved.insert(name, address),
                 _ => None
