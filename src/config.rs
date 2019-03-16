@@ -53,19 +53,28 @@ impl Display for DdnsEntry {
 #[serde(tag = "type")]
 pub enum IpAddress {
     #[serde(rename = "parameter")]
-    FromParameter {
-        parameter: Option<String>,
-    },
+    FromParameter(IpAddressFromParameter),
     #[serde(rename = "static")]
-    Static {
-        address: IpAddr,
-    },
+    Static(IpAddressStatic),
     #[serde(rename = "derived")]
-    Derived {
-        subnet_bits: u8,
-        host_entry: String,
-        subnet_entry: String,
-    }
+    Derived(IpAddressDerived),
+}
+
+#[derive(Clone, PartialEq, Debug, Deserialize)]
+pub struct IpAddressFromParameter {
+    pub parameter: Option<String>,
+}
+
+#[derive(Clone, PartialEq, Debug, Deserialize)]
+pub struct IpAddressStatic {
+    pub address: IpAddr,
+}
+
+#[derive(Clone, PartialEq, Debug, Deserialize)]
+pub struct IpAddressDerived {
+    pub subnet_bits: u8,
+    pub host_entry: String,
+    pub subnet_entry: String,
 }
 
 pub fn read_config(config_file: &Path) -> Result<Config, Error> {
@@ -122,22 +131,22 @@ mod tests {
         let (_temp_dir, config_file_path) = create_temp_file(config_file_content);
 
         let mut ip_addresses = HashMap::new();
-        ip_addresses.insert("addr1".to_string(), IpAddress::FromParameter {
+        ip_addresses.insert("addr1".to_string(), IpAddress::FromParameter(IpAddressFromParameter {
             parameter: Some("addr1".to_string())
-        });
-        ip_addresses.insert("some_static_addr".to_string(), IpAddress::Static {
+        }));
+        ip_addresses.insert("some_static_addr".to_string(), IpAddress::Static(IpAddressStatic {
             address: "2001:DB8:123:abcd::1".parse().unwrap(),
-        });
-        ip_addresses.insert("calculated_address".to_string(), IpAddress::Derived {
+        }));
+        ip_addresses.insert("calculated_address".to_string(), IpAddress::Derived(IpAddressDerived {
             subnet_bits: 64,
             subnet_entry: "addr1".to_string(),
-            host_entry: "some_static_addr".to_string()
-        });
+            host_entry: "some_static_addr".to_string(),
+        }));
         let expected = Config {
             server: Server {
                 username: Some("a_user".to_string()),
                 password: Some("a_password".to_string()),
-                port: Some(3001)
+                port: Some(3001),
             },
             ip_addresses,
             ddns_entries: vec![

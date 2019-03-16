@@ -22,6 +22,7 @@ mod command_line;
 mod server;
 mod config;
 mod resolver;
+mod resolver_derived;
 mod updater;
 mod basic_auth_header;
 
