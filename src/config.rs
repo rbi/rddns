@@ -58,6 +58,8 @@ pub enum IpAddress {
     Static(IpAddressStatic),
     #[serde(rename = "derived")]
     Derived(IpAddressDerived),
+    #[serde(rename = "interface")]
+    Interface(IpAddressInterface),
 }
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
@@ -75,6 +77,20 @@ pub struct IpAddressDerived {
     pub subnet_bits: u8,
     pub host_entry: String,
     pub subnet_entry: String,
+}
+
+#[derive(Clone, PartialEq, Debug, Deserialize)]
+pub struct IpAddressInterface {
+    pub interface: String,
+    pub family: IpAddressFamily,
+}
+
+#[derive(Clone, PartialEq, Debug, Deserialize)]
+pub enum IpAddressFamily {
+    #[serde(rename = "v4")]
+    V4,
+    #[serde(rename = "v6")]
+    V6
 }
 
 pub fn read_config(config_file: &Path) -> Result<Config, Error> {
@@ -111,6 +127,11 @@ mod tests {
         [ip.some_static_addr]
         type = "static"
         address = "2001:DB8:123:abcd::1"
+
+        [ip.interfaceAddress]
+        type = "interface"
+        interface = "eth0"
+        family = "v4"
 
         [ip.calculated_address]
         type = "derived"

@@ -17,6 +17,7 @@ log = "0.4.6"
 simplelog = "0.5.3"
 clap = "2.32.0"
 base64 = "0.10.0"
+pnet = "0.22.0"
 
 [dev-dependencies]
 tempdir = "0.3.7"

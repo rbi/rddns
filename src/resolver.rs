@@ -5,6 +5,7 @@ use regex::Regex;
 
 use config::{Config, IpAddress, DdnsEntry};
 use resolver_derived::resolve_derived;
+use resolver_interface::resolve_interface;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct ResolvedDdnsEntry {
@@ -83,6 +84,7 @@ fn resolve_addresses<'a>(address_defs: &HashMap<String, IpAddress>,
                 IpAddress::FromParameter(val) => address_actual.
                     get(val.parameter.as_ref().unwrap_or(&name.to_string())).cloned(),
                 IpAddress::Derived(val) => resolve_derived(val, &resolved),
+                IpAddress::Interface(val) => resolve_interface(val)
             } {
                 Some(address) => resolved.insert(name.to_string(), address),
                 _ => None

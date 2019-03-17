@@ -3,6 +3,7 @@ extern crate hyper;
 extern crate hyper_tls;
 extern crate futures;
 extern crate base64;
+extern crate pnet;
 
 #[macro_use]
 extern crate serde_derive;
@@ -23,6 +24,7 @@ mod server;
 mod config;
 mod resolver;
 mod resolver_derived;
+mod resolver_interface;
 mod updater;
 mod basic_auth_header;
 
