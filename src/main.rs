@@ -4,6 +4,7 @@ extern crate hyper_tls;
 extern crate futures;
 extern crate base64;
 extern crate pnet;
+extern crate ipnetwork;
 
 #[macro_use]
 extern crate serde_derive;

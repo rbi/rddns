@@ -39,16 +39,24 @@ type = "static"
 address = "2001:DB8:123:abcd::1"
 
 # IP address sources of type "interface" provide the current IP address of an interface.
+#
+# Network interfaces usually have more than one IP address these days. With the network parameter it is possible to
+# describe the IP address that should be selected. If multiple addresses match an abitrary one is choosen.
+#
+# E.g.
+# "0.0.0.0/0": any IPv4 address
+# "::/0"     : any IPv6 address
+# "2000::/3" : any Internet IPv6 address
 [ip.interfaceAddress]
 type = "interface"
-interface = "eth0"
+network = "0.0.0.0/32"
 family = "v4"
 
 # IP address sources of type "derived" combine the host part and the net part of two other "ip" entries to create a new
-# IP address. The "subnet_entry" and the "host_entry" configuration options define which other IP adresses should be
+# IP address. The "subnet_entry" and the "host_entry" configuration options define which other IP addresses should be
 # used for the host and for the net part.
 #
-# This is usefull to update global IPv6 addresses where the host part is fixed as it is derived from the MAC address but
+# This is useful to update global IPv6 addresses where the host part is fixed as it is derived from the MAC address but
 # the provider assigns a different IPv6 subnet on every reconect. The router could then pass its own IPv6 address to the
 # HTTP server of rddns. With this entry the net part of the routers IPv6 address can than be combined with the host part
 # of a device behind the router.

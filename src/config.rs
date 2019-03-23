@@ -82,15 +82,7 @@ pub struct IpAddressDerived {
 #[derive(Clone, PartialEq, Debug, Deserialize)]
 pub struct IpAddressInterface {
     pub interface: String,
-    pub family: IpAddressFamily,
-}
-
-#[derive(Clone, PartialEq, Debug, Deserialize)]
-pub enum IpAddressFamily {
-    #[serde(rename = "v4")]
-    V4,
-    #[serde(rename = "v6")]
-    V6
+    pub network: String,
 }
 
 pub fn read_config(config_file: &Path) -> Result<Config, Error> {
@@ -131,7 +123,7 @@ mod tests {
         [ip.interfaceAddress]
         type = "interface"
         interface = "eth0"
-        family = "v4"
+        network = "::/0"
 
         [ip.calculated_address]
         type = "derived"
@@ -157,6 +149,10 @@ mod tests {
         }));
         ip_addresses.insert("some_static_addr".to_string(), IpAddress::Static(IpAddressStatic {
             address: "2001:DB8:123:abcd::1".parse().unwrap(),
+        }));
+        ip_addresses.insert("interfaceAddress".to_string(), IpAddress::Interface(IpAddressInterface {
+            interface: "eth0".parse().unwrap(),
+            network: "::/0".parse().unwrap(),
         }));
         ip_addresses.insert("calculated_address".to_string(), IpAddress::Derived(IpAddressDerived {
             subnet_bits: 64,

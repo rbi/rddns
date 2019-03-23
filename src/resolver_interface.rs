@@ -1,10 +1,14 @@
 use std::net::IpAddr;
 use pnet::datalink::{interfaces, NetworkInterface};
-use config::{IpAddressInterface, IpAddressFamily};
+use ipnetwork::IpNetwork;
+use config::IpAddressInterface;
 
 pub fn resolve_interface(config: &IpAddressInterface) -> Option<IpAddr> {
-    get_interface(&config.interface)
-        .and_then(|iface| get_ip_address(&iface, &config.family))
+    config.network.parse()
+        .map_err(|_| warn!("The configured string \"{}\" is not a valid IP network.", config.network))
+        .ok().and_then(|network|
+                  get_interface(&config.interface)
+                  .and_then(|iface| get_ip_address(&iface, &network)))
 }
 
 fn get_interface(name: &str) -> Option<NetworkInterface> {
@@ -13,11 +17,10 @@ fn get_interface(name: &str) -> Option<NetworkInterface> {
         .next()
 }
 
-fn get_ip_address(iface: &NetworkInterface, family: &IpAddressFamily) -> Option<IpAddr> {
+fn get_ip_address(iface: &NetworkInterface, expected_network: &IpNetwork) -> Option<IpAddr> {
     iface.ips.iter()
         .map(|network| network.ip())
-        .filter(|ip| (*family == IpAddressFamily::V4 && ip.is_ipv4() ) ||
-                    (*family == IpAddressFamily::V6 && ip.is_ipv6()))
+        .filter(|ip| expected_network.contains(*ip))
         .map(|addr| addr.clone())
         .next()
 }
