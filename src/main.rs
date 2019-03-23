@@ -98,7 +98,7 @@ fn do_update(config: &Config, addresses: &HashMap<String, IpAddr>) -> impl Futur
     join_all(work).and_then(|results| {
         let error = results.join("\n");
 
-        if error.is_empty() {
+        if error.is_empty() || error == "\n" {
             ok(())
         } else {
             err(error.to_string())
