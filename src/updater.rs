@@ -1,7 +1,7 @@
 use hyper::{Body, Client, Request, Uri};
 use hyper::header::AUTHORIZATION;
 use futures::future::Future;
-use hyper_tls::HttpsConnector;
+use hyper_rustls::HttpsConnector;
 
 use resolver::ResolvedDdnsEntry;
 use basic_auth_header::{to_auth_header_value, to_auth_header_value_no_password};
@@ -9,7 +9,7 @@ use basic_auth_header::{to_auth_header_value, to_auth_header_value_no_password};
 
 pub fn update_dns(ddns_entry: &ResolvedDdnsEntry) -> impl Future<Item=(), Error=String> {
     let uri: Uri = ddns_entry.url.parse().unwrap();
-    let https_connector = HttpsConnector::new(4).unwrap();
+    let https_connector = HttpsConnector::new(4);
     let client = Client::builder().build(https_connector);
 
     let mut request = Request::builder();

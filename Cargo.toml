@@ -5,7 +5,7 @@ authors = ["Raik Bieniek <dev@voidnode.de>"]
 
 [dependencies]
 hyper = "0.12.23"
-hyper-tls = "0.3.1"
+hyper-rustls = "0.16.1"
 futures = "0.1.25"
 tokio = "0.1.15"
 toml = "0.4.10"
