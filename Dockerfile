@@ -1,27 +1,20 @@
-FROM alpine
+FROM ekidd/rust-musl-builder:stable as builder
 LABEL maintainer "raik@voidnode.de"
 
-WORKDIR /rddns
-COPY . .
-
-# install build tools
-RUN apk add --no-cache cargo
+# copy source
+COPY --chown=rust . .
 
 # build
-RUN cargo build --release
+RUN cargo build --release --target=x86_64-unknown-linux-musl && \
+    strip target/x86_64-unknown-linux-musl/release/rddns
 
-FROM alpine
+FROM scratch
 LABEL maintainer "raik@voidnode.de"
 
 # install
-COPY --from=0 /rddns/target/release/rddns /rddns
-
-RUN chown root:root /rddns && \
-    apk add --no-cache libgcc && \
-    adduser -S rddns
+COPY --from=builder /home/rust/src/target/x86_64-unknown-linux-musl/release/rddns /rddns
 
 VOLUME /config
-USER rddns
 
 ENTRYPOINT ["/rddns", "-c", "/config/config.toml"]
 CMD ["server"]
