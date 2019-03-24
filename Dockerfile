@@ -14,7 +14,7 @@ LABEL maintainer "raik@voidnode.de"
 # install
 COPY --from=builder /home/rust/src/target/x86_64-unknown-linux-musl/release/rddns /rddns
 
-VOLUME /config
+VOLUME /config/config.toml
 
 ENTRYPOINT ["/rddns", "-c", "/config/config.toml"]
 CMD ["server"]
