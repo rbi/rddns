@@ -1,37 +1,50 @@
-use hyper::{Body, Client, Request, Uri};
-use hyper::header::AUTHORIZATION;
-use futures::future::Future;
-use hyper_rustls::HttpsConnector;
+use std::collections::HashMap;
+use std::net::IpAddr;
 
-use resolver::ResolvedDdnsEntry;
-use basic_auth_header::{to_auth_header_value, to_auth_header_value_no_password};
+use futures::future::{result, Future, ok, err, join_all};
 
+use update_executer::update_dns;
+use resolver::{resolve_config, ResolvedDdnsEntry, ResolveFailed};
+use config::Config;
 
-pub fn update_dns(ddns_entry: &ResolvedDdnsEntry) -> impl Future<Item=(), Error=String> {
-    let uri: Uri = ddns_entry.url.parse().unwrap();
-    let https_connector = HttpsConnector::new(4);
-    let client = Client::builder().build(https_connector);
+pub fn do_update(config: &Config, addresses: &HashMap<String, IpAddr>) -> impl Future<Item=(), Error=String> + Send {
+    info!("updating DDNS entries");
 
-    let mut request = Request::builder();
-    request.uri(uri);
+    let resolved_entries = resolve_config(config, addresses);
+    let work = resolved_entries.iter()
+        .map(execute_resolved_dns_entry)
+        .collect::<Vec<_>>();
 
+    join_all(work).and_then(combine_errors)
+}
 
-    ddns_entry.original.username.as_ref().map(|username| {
-        let header_value = ddns_entry.original.password.as_ref()
-            .map_or(to_auth_header_value_no_password(username), |ref password| {
-                to_auth_header_value(username, password)
-            });
-        request.header(AUTHORIZATION, header_value);
-    });
-
-    client.request(request.body(Body::empty()).unwrap())
-        .map_err(|err| err.to_string())
-        .and_then(|result| {
-            let result_code = result.status().as_u16();
-            if result_code < 300 {
-                Ok(())
-            } else {
-                Err(format!("Failed to update DDNS entry. HTTP return code was {}.", result_code))
-            }
+fn execute_resolved_dns_entry(resolved: &Result<ResolvedDdnsEntry, ResolveFailed>) -> impl Future<Item=String, Error=String> + Send {
+    let resolved = resolved.clone();
+    result(resolved)
+        .map_err(|e| format!("Updating DDNS \"{}\" failed. Reason: {}", e, e.message))
+        .and_then(|ref resolved| {
+            let resolved2 = resolved.clone();
+            let resolved3 = resolved.clone();
+            update_dns(resolved)
+                .map(move |_| info!("Successfully updated DDNS entry {}", resolved2))
+                .map_err(move |error_msg| format!("Updating DDNS \"{}\" failed. Reason: {}", resolved3, error_msg))
         })
+        .then(|result|
+            ok(match result {
+                Ok(_) => "".to_owned(),
+                Err(error_msg) => {
+                    error!("{}", error_msg);
+                    error_msg
+                }
+            }))
+}
+
+fn combine_errors(results: Vec<String>) -> impl Future<Item=(), Error=String> + Send {
+    let error = results.join("\n");
+
+    if error.is_empty() || error == "\n" {
+        ok(())
+    } else {
+        err(error.to_string())
+    }
 }

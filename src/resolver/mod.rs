@@ -1,11 +1,14 @@
+mod resolver_derived;
+mod resolver_interface;
+
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::net::IpAddr;
 use regex::Regex;
 
 use config::{Config, IpAddress, DdnsEntry};
-use resolver_derived::resolve_derived;
-use resolver_interface::resolve_interface;
+use self::resolver_derived::resolve_derived;
+use self::resolver_interface::resolve_interface;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct ResolvedDdnsEntry {
