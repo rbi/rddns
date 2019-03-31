@@ -48,7 +48,6 @@ impl<T, F> Service for RequestHandler<T, F>
     type ReqBody = hyper::Body;
     type ResBody = hyper::Body;
     type Error = hyper::http::Error;
-    //    type Future = hyper::client::ResponseFuture;
     type Future = Box<Future<Item=Response<Body>, Error=Self::Error> + Send>;
 
     fn call(&mut self, req: Request<Self::ReqBody>) -> Self::Future {

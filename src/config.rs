@@ -34,7 +34,7 @@ impl Default for Server {
     }
 }
 
-#[derive(Clone, PartialEq, Debug, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Deserialize)]
 pub struct DdnsEntry {
     pub url: String,
     pub username: Option<String>,

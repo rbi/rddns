@@ -33,7 +33,8 @@ use tokio::runtime::Runtime;
 use simplelog::{SimpleLogger, TermLogger, CombinedLogger, LevelFilter, Config as SimpleLogConfig};
 
 use command_line::{ExecutionMode, parse_command_line};
-use updater::do_update;
+use updater::Updater;
+use server::create_server;
 
 fn main() -> Result<(), String> {
     init_logging();
@@ -42,10 +43,11 @@ fn main() -> Result<(), String> {
 
     let config = config::read_config(&cmd_args.config_file).map_err(|err| err.to_string())?;
 
+    let updater = Updater::new(config.clone());
     let mut rt = Runtime::new().unwrap();
     match cmd_args.execution_mode {
-        ExecutionMode::SERVER => rt.block_on(server::create_server(do_update, config.server.clone(), config)),
-        ExecutionMode::UPDATE => rt.block_on(do_update(&config, &cmd_args.addresses))
+        ExecutionMode::SERVER => rt.block_on(create_server(|updater, addr| updater.do_update(addr), config.server, updater)),
+        ExecutionMode::UPDATE => rt.block_on(updater.do_update(&cmd_args.addresses))
     }
 }
 

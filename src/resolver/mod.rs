@@ -10,13 +10,13 @@ use config::{Config, IpAddress, DdnsEntry};
 use self::resolver_derived::resolve_derived;
 use self::resolver_interface::resolve_interface;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub struct ResolvedDdnsEntry {
     pub url: String,
     pub original: DdnsEntry,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub struct ResolveFailed {
     pub template_url: String,
     pub message: String,
