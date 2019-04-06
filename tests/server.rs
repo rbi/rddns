@@ -12,7 +12,7 @@ use rddns_driver::RddnsProcess;
 fn prints_to_console_on_request() {
 
     // setup
-    let mut rddns = RddnsProcess::new("server");
+    let mut rddns = RddnsProcess::new("trigger");
 
     let client = Client::new();
     let uri = rddns.get_url().parse().unwrap();
@@ -26,7 +26,6 @@ fn prints_to_console_on_request() {
             assert!(response.status().as_u16() < 300);
 
             assert!(rddns.stdout_readln().ends_with("Listening on port 3092\n"));
-            assert!(rddns.stdout_readln().ends_with("updating DDNS entries\n"));
             assert!(rddns.is_running().unwrap())
         }
         Err(err) => panic!(err)

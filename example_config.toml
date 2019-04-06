@@ -49,8 +49,8 @@ address = "2001:DB8:123:abcd::1"
 # "2000::/3" : any Internet IPv6 address
 [ip.interfaceAddress]
 type = "interface"
+interface = "eth0"
 network = "0.0.0.0/32"
-family = "v4"
 
 # IP address sources of type "derived" combine the host part and the net part of two other "ip" entries to create a new
 # IP address. The "subnet_entry" and the "host_entry" configuration options define which other IP addresses should be
@@ -77,16 +77,19 @@ host_entry = "some_address"
 # that is configured with the "url" option. The URL can contain placeholder in the form of "{<identifier>}" where
 # <identifier> must be the identifier of one of the IP addresses sources configured in an "[ip.*]" section. These
 # placeholders will be replaced with the current IP addresse of the source on update.
-# If update reqiuieres authentication credentials can be configured with the "username" and "password" options.
-#
+
 # The following entry is an example how to update an entry at the Hurrican Electric dynamic DNS service.
 [[ddns_entry]]
 url = "https://dyn.dns.he.net/nic/update?hostname=update.example.com?&myip={some_address}"
+# Basic credentials that are passed to the server when updating.
+#
+# Default if missing: No authentication is done.
 username = "update.example.com"
 password = "secret"
 # When executing updates rddns returns appropriate HTTP error codes or command exit code when updating an entry failed.
 # Setting the following to true will ignore failures of this entry when calculating the code to return to the user.
-# If missing this defaults to "false".
+#
+# Default if missing: "false"
 ignore_error = true
 
 # The following example demonstrates an update at a service that does not require credentials. The URL that is called
@@ -96,17 +99,35 @@ ignore_error = true
 url = "http://example.com/dynupdate/{otherAddress}?doUpdate=true"
 
 ##
-## server
+## triggers
 ##
 
-# This section configures the embedded HTTP server. It is optional. When it is missing default values will be used as
-# described bellow.
-[server]
+# Specifies the events that will trigger DDNS update.
+#
+# Multiple triggers can be specified. Trigger configurations are only considdered when executing rddns in "trigger"
+# mode. When running in "update" mode they are ignored.
+# Actual updates are only carried out if the calculated URLs for updates differ from the last time an update was
+# triggered.
+
+# A trigger that fires automatically in fixed intervals.
+[[trigger]]
+type = "timed"
+# Configures the interval in wich the timed trigger will trigger.
+# This value is configured in seconds.
+#
+# Default if missing: 300
+interval = 600
+
+# Triggers DDNS update on HTTP requests to the embedded HTTP server.
+[[trigger]]
+type = "http"
 # Configures username/password credentials that must be passed in HTTP requests to authorize update requests. BASIC auth
 # must be used. When invalid credentials are supplied no DDNS updates are triggered.
-# When no credentials are configured anybody can trigger DDNS updates via HTTP without authorization.
+#
+# Default if missing: Anybody can trigger DDNS updates via HTTP without authorization.
 username = "admin"
 password = "S3cr3T"
 # The TCP port the server should listen on.
-# Defaults to 3092 if missing.
+#
+# Default if missing: 3092
 port = 3042

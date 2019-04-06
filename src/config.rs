@@ -8,7 +8,8 @@ use std::net::IpAddr;
 #[derive(Clone, PartialEq, Debug, Deserialize)]
 pub struct Config {
     #[serde(default)]
-    pub server: Server,
+    #[serde(rename = "trigger")]
+    pub triggers: Vec<Trigger>,
     #[serde(default)]
     #[serde(rename = "ddns_entry")]
     pub ddns_entries: Vec<DdnsEntry>,
@@ -18,20 +19,36 @@ pub struct Config {
 }
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
-pub struct Server {
-    pub username: Option<String>,
-    pub password: Option<String>,
-    pub port: Option<u16>
+#[serde(tag = "type")]
+pub enum Trigger {
+    #[serde(rename = "http")]
+    HTTP(TriggerHttp),
+    #[serde(rename = "timed")]
+    TIMED(TriggerTimed)
 }
 
-impl Default for Server {
+#[derive(Clone, PartialEq, Debug, Deserialize)]
+pub struct TriggerHttp {
+    pub username: Option<String>,
+    pub password: Option<String>,
+    #[serde(default = "default_server_port")]
+    pub port: u16
+}
+
+impl Default for TriggerHttp {
     fn default() -> Self {
-        Server {
+        TriggerHttp {
             username: None,
             password: None,
-            port: None
+            port: default_server_port()
         }
     }
+}
+
+#[derive(Clone, PartialEq, Debug, Deserialize)]
+pub struct TriggerTimed {
+    #[serde(default = "default_interval")]
+    pub interval: u32,
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Deserialize)]
@@ -94,6 +111,14 @@ pub fn read_config(config_file: &Path) -> Result<Config, Error> {
 
 fn get_false() -> bool {false}
 
+fn default_interval() -> u32 {
+    300
+}
+
+fn default_server_port() -> u16 {
+    3092
+}
+
 #[cfg(test)]
 mod tests {
     extern crate tempdir;
@@ -107,10 +132,15 @@ mod tests {
     #[test]
     fn can_read_maximal_config_file() {
         let config_file_content = br#"
-        [server]
+        [[trigger]]
+        type = "http"
         username = "a_user"
         password = "a_password"
         port = 3001
+
+        [[trigger]]
+        type = "timed"
+        interval = 5153
 
         [ip.addr1]
         type = "parameter"
@@ -160,11 +190,13 @@ mod tests {
             host_entry: "some_static_addr".to_string(),
         }));
         let expected = Config {
-            server: Server {
+            triggers: vec![Trigger::HTTP(TriggerHttp {
                 username: Some("a_user".to_string()),
                 password: Some("a_password".to_string()),
-                port: Some(3001),
-            },
+                port: 3001,
+            }), Trigger::TIMED(TriggerTimed {
+                interval: 5153
+            })],
             ip_addresses,
             ddns_entries: vec![
                 DdnsEntry {
@@ -194,11 +226,7 @@ mod tests {
         let (_temp_dir, config_file_path) = create_temp_file(config_file_content);
 
         let expected = Config {
-            server: Server {
-                username: None,
-                password: None,
-                port: None
-            },
+            triggers: vec![],
             ip_addresses: HashMap::new(),
             ddns_entries: vec![],
         };
@@ -207,6 +235,13 @@ mod tests {
             .expect("It should be possible to read the test config file.");
 
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn can_read_exemplary_config_file() {
+        let config_file_path = Path::new("example_config.toml");
+
+        read_config(&config_file_path).expect("The exemplary config file should be readable.");
     }
 
     fn create_temp_file(content: &[u8]) -> (TempDir, PathBuf) {

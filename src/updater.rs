@@ -23,7 +23,7 @@ impl Updater {
     }
 
     pub fn do_update(&self, addresses: &HashMap<String, IpAddr>) -> impl Future<Item=(), Error=String> + Send {
-        info!("updating DDNS entries");
+        debug!("updating DDNS entries");
 
         let work = resolve_config(&self.config, addresses).iter()
             .filter(|entry| self.filter_unchanged(entry))

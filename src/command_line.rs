@@ -12,7 +12,7 @@ pub struct CommandLine {
 
 pub enum ExecutionMode {
     UPDATE,
-    SERVER,
+    TRIGGER,
 }
 
 pub fn parse_command_line() -> CommandLine {
@@ -38,8 +38,8 @@ They must have the form [name]=[address], e.g. my_parameter=203.0.113.25 .")
                 .multiple(true)
                 .use_delimiter(true)
                 .validator(validate_ip_parameter)))
-        .subcommand(SubCommand::with_name("server")
-            .about("Starts an HTTP server listening for update requests for DynDNS entries."))
+        .subcommand(SubCommand::with_name("trigger")
+            .about("Starts and waits for configured triggers for updating DynDNS entries to occure."))
         .get_matches();
 
     CommandLine {
@@ -49,7 +49,7 @@ They must have the form [name]=[address], e.g. my_parameter=203.0.113.25 .")
         },
         execution_mode: match matches.subcommand_name() {
             Some("update") => ExecutionMode::UPDATE,
-            Some("server") => ExecutionMode::SERVER,
+            Some("trigger") => ExecutionMode::TRIGGER,
             _ => panic!("BUG: No or unknown sub command was passed. This should not be possible.")
         },
         config_file: get_config_file(matches.value_of("config").unwrap()),

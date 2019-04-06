@@ -8,14 +8,14 @@ use hyper::header::{HeaderMap, WWW_AUTHENTICATE, AUTHORIZATION};
 use regex::Regex;
 use std::net::{AddrParseError, IpAddr};
 
-use config::Server as ServerConfig;
+use config::TriggerHttp;
 use basic_auth_header::BasicAuth;
 
 pub fn create_server<T, F>(update_callback: fn(&T, &HashMap<String, IpAddr>) -> F,
-                           server_config: ServerConfig, user_data: T) -> Box<Future<Item=(), Error=String> + Send>
+                           server_config: TriggerHttp, user_data: T) -> Box<Future<Item=(), Error=String> + Send>
     where T: Clone + Send + Sync + 'static,
           F: Future<Item=(), Error=String> + Send + 'static {
-    let port = server_config.port.unwrap_or(3092);
+    let port = server_config.port;
     match format!("[::]:{}", port).parse().map_err(|err: AddrParseError| err.to_string()) {
         Ok(addr) => {
             let service_creator = move || {
@@ -38,7 +38,7 @@ pub fn create_server<T, F>(update_callback: fn(&T, &HashMap<String, IpAddr>) -> 
 
 struct RequestHandler<T, F> {
     update_callback: fn(&T, &HashMap<String, IpAddr>) -> F,
-    server_config: ServerConfig,
+    server_config: TriggerHttp,
     user_data: T,
 }
 
@@ -74,7 +74,7 @@ impl<T, F> Service for RequestHandler<T, F>
     }
 }
 
-fn check_authorisation(headers: &HeaderMap, config: &ServerConfig) -> Result<(), ()> {
+fn check_authorisation(headers: &HeaderMap, config: &TriggerHttp) -> Result<(), ()> {
     match config.username {
         Some(ref username) => {
             headers.get(AUTHORIZATION)
@@ -169,10 +169,10 @@ mod tests {
 
     #[test]
     fn authorized_when_no_credentials_are_required() {
-        let conf = ServerConfig {
+        let conf = TriggerHttp {
             username: None,
             password: None,
-            port: None,
+            port: 518,
         };
 
         let mut headers_with_auth = HeaderMap::new();
@@ -186,10 +186,10 @@ mod tests {
 
     #[test]
     fn authorized_when_correct_credentials_are_passed() {
-        let conf = ServerConfig {
+        let conf = TriggerHttp {
             username: Some("some_user".to_string()),
             password: Some("some_password".to_string()),
-            port: None,
+            port: 1234,
         };
 
 
@@ -201,10 +201,10 @@ mod tests {
 
     #[test]
     fn not_authorized_when_credentials_are_required_but_wrong_or_missing() {
-        let conf = ServerConfig {
+        let conf = TriggerHttp {
             username: Some("some_user".to_string()),
             password: Some("some_password".to_string()),
-            port: None,
+            port: 5678,
         };
 
         let headers_without_auth = HeaderMap::new();
@@ -223,10 +223,10 @@ mod tests {
 
     #[test]
     fn authorization_works_for_username_without_password_config() {
-        let conf = ServerConfig {
+        let conf = TriggerHttp {
             username: Some("some_user".to_string()),
             password: None,
-            port: None,
+            port: 816,
         };
 
         let mut headers_with_right_user = HeaderMap::new();

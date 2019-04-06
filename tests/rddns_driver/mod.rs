@@ -18,7 +18,7 @@ impl RddnsProcess {
     /// * `command` -  The rddns sub-command that should be executed.
     pub fn new(command: &str) -> RddnsProcess {
         let executable = target_dir().join("rddns");
-        let example_config = rddns_driver_src_dir().join("empty_config.toml");
+        let example_config = rddns_driver_src_dir().join("sample_config.toml");
 
         let mut process = Command::new(executable)
             .arg("-c")
