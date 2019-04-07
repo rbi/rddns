@@ -78,18 +78,25 @@ impl Drop for RddnsProcess {
     }
 }
 
+fn parent_dir_with_file(dir: PathBuf, file: &str) -> Option<PathBuf> {
+    let mut file_path = dir.clone();
+    file_path.push(file);
+    if file_path.exists() {
+        return Some(dir)
+    }
+    dir.parent().and_then(|parent| parent_dir_with_file(parent.to_path_buf(), file))
+}
+
 fn target_dir() -> PathBuf {
-    env::current_exe()
-        .unwrap().parent().and_then(|p| p.parent())
-        .expect("The test executable should have two parent directories be available.")
-        .to_path_buf()
+    parent_dir_with_file(
+        env::current_exe().unwrap().parent().unwrap().to_path_buf(),
+        "rddns")
+        .expect("Did not find target dir.")
 }
 
 fn base_dir() -> PathBuf {
-    target_dir()
-        .parent().unwrap()
-        .parent().unwrap()
-        .to_path_buf()
+    parent_dir_with_file(target_dir(), "Cargo.toml")
+        .expect("Did not find base dir.")
 }
 
 fn rddns_driver_src_dir() -> PathBuf {
