@@ -6,7 +6,8 @@ COPY --chown=rust . .
 
 # build
 RUN cargo build --release --target=x86_64-unknown-linux-musl && \
-    strip target/x86_64-unknown-linux-musl/release/rddns
+    strip target/x86_64-unknown-linux-musl/release/rddns && \
+    cargo test --release
 
 FROM scratch
 LABEL maintainer "raik@voidnode.de"
