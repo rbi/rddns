@@ -1,6 +1,7 @@
 use base64::{encode_config_buf, decode};
 use regex::Regex;
 use std::str::from_utf8;
+use std::convert::TryFrom;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct BasicAuth {
@@ -9,7 +10,27 @@ pub struct BasicAuth {
 }
 
 impl BasicAuth {
-    pub fn try_from(value: &str) -> Result<Self, String> {
+    fn decoded_to_basic_auth(decoded: &str) -> BasicAuth {
+        match decoded.find(":") {
+            Some(seperator) => BasicAuth {
+                username: decoded[..seperator].to_owned(),
+                password: Some(decoded[seperator + 1..].to_owned()),
+            },
+            None => {
+                BasicAuth {
+                    username: decoded.to_owned(),
+                    password: None
+                }
+            }
+        }
+    }
+}
+
+impl TryFrom<&str> for BasicAuth {
+
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, String> {
         lazy_static! {
             static ref BASIC_HEADER: Regex = Regex::new(r"^Basic\s+([A-Za-z0-9+/=]+)$").unwrap();
         }
@@ -24,21 +45,6 @@ impl BasicAuth {
             },
             None => {
                 Err("The value passed did not match the expected Basic auth header format.".to_owned())
-            }
-        }
-    }
-
-    fn decoded_to_basic_auth(decoded: &str) -> BasicAuth {
-        match decoded.find(":") {
-            Some(seperator) => BasicAuth {
-                username: decoded[..seperator].to_owned(),
-                password: Some(decoded[seperator + 1..].to_owned()),
-            },
-            None => {
-                BasicAuth {
-                    username: decoded.to_owned(),
-                    password: None
-                }
             }
         }
     }

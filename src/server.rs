@@ -7,6 +7,7 @@ use hyper::service::Service;
 use hyper::header::{HeaderMap, WWW_AUTHENTICATE, AUTHORIZATION};
 use regex::Regex;
 use std::net::{AddrParseError, IpAddr};
+use std::convert::TryFrom;
 
 use config::TriggerHttp;
 use basic_auth_header::BasicAuth;
