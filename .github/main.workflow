@@ -40,7 +40,7 @@ action "extract binary" {
 }
 
 action "rbi/release-to-github" {
-  uses = "rbi/release-to-github@82b9801c460ae36a18f831d8983e9b1ca319fb25"
+  uses = "rbi/release-to-github@04e7321e80a5ed9150686c2fc9e03feab2c2b26f"
   needs = [
     "calculate version",
     "extract binary"
