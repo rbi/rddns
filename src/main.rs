@@ -83,7 +83,7 @@ fn init_logging() {
 }
 
 
-fn create_trigger_future(trigger: Trigger, config: &Config) -> Box<Future<Item=(), Error=String> + Send> {
+fn create_trigger_future(trigger: Trigger, config: &Config) -> Box<dyn Future<Item=(), Error=String> + Send> {
     lazy_static! {
         static ref EMPTY: HashMap<String, IpAddr> = HashMap::new();
     }

@@ -13,7 +13,7 @@ use config::TriggerHttp;
 use basic_auth_header::BasicAuth;
 
 pub fn create_server<T, F>(update_callback: fn(&T, &HashMap<String, IpAddr>) -> F,
-                           server_config: TriggerHttp, user_data: T) -> Box<Future<Item=(), Error=String> + Send>
+                           server_config: TriggerHttp, user_data: T) -> Box<dyn Future<Item=(), Error=String> + Send>
     where T: Clone + Send + Sync + 'static,
           F: Future<Item=(), Error=String> + Send + 'static {
     let port = server_config.port;
@@ -49,7 +49,7 @@ impl<T, F> Service for RequestHandler<T, F>
     type ReqBody = hyper::Body;
     type ResBody = hyper::Body;
     type Error = hyper::http::Error;
-    type Future = Box<Future<Item=Response<Body>, Error=Self::Error> + Send>;
+    type Future = Box<dyn Future<Item=Response<Body>, Error=Self::Error> + Send>;
 
     fn call(&mut self, req: Request<Self::ReqBody>) -> Self::Future {
         let authorized = check_authorisation(req.headers(), &self.server_config);
