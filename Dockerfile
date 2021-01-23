@@ -30,4 +30,4 @@ COPY --from=builder /work/target/${TARGET_PLATFORM}/release/rddns /rddns
 VOLUME /config/config.toml
 
 ENTRYPOINT ["/rddns", "-c", "/config/config.toml"]
-CMD ["server"]
+CMD ["trigger"]
