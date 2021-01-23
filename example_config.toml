@@ -73,13 +73,17 @@ host_entry = "some_address"
 ## ddns_entry
 ##
 
-# Each [[ddns_entry]] section configures a Dynamic DNS entry that should be updated. Updates are HTTP requests to an URL
-# that is configured with the "url" option. The URL can contain placeholder in the form of "{<identifier>}" where
-# <identifier> must be the identifier of one of the IP addresses sources configured in an "[ip.*]" section. These
-# placeholders will be replaced with the current IP addresse of the source on update.
+# Each [[ddns_entry]] section configures a Dynamic DNS entry that should be updated. An [[ddns_entry]] is either a HTTP
+# request that triggers the update or an file on the filesystem that should be rewritten.
+
+# If type=http  a HTTP request is executed to trigger the update. The URL that should be called  is configured with the
+# "url" option. The URL can contain placeholder in the form of "{<identifier>}" where <identifier> must be the identifier
+# of one of the IP addresses sources configured in an "[ip.*]" section. These placeholders will be replaced with the current
+# IP addresse of the source on update.
 
 # The following entry is an example how to update an entry at the Hurrican Electric dynamic DNS service.
 [[ddns_entry]]
+type = "http"
 url = "https://dyn.dns.he.net/nic/update?hostname=update.example.com?&myip={some_address}"
 # Basic credentials that are passed to the server when updating.
 #
@@ -96,7 +100,19 @@ ignore_error = true
 # would be resolved to "http://example.com/dynupdate/2001:DB8:123:abcd::1?doUpdate=true" as "otherAddress" is configured
 # above to be a static IP address.
 [[ddns_entry]]
+type = "http"
 url = "http://example.com/dynupdate/{otherAddress}?doUpdate=true"
+
+# The following example shows how to write IP addresses to a file. The file option specifies which file should be written.
+# The template defines the content that should be written to that file. Placeholders in the form of "{<identifier>}" are
+# replaced with IP addresses as described above.
+[[ddns_entry]]
+type = "file"
+file = "/etc/someSoftware/conf.d/dynamicIP.conf"
+replace = """{
+  "externalIP": "{some_address}",
+  "otherIP" : "{otherAddress}"
+}"""
 
 ##
 ## triggers

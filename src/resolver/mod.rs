@@ -10,27 +10,27 @@ use config::{Config, IpAddress, DdnsEntry};
 use self::resolver_derived::resolve_derived;
 use self::resolver_interface::resolve_interface;
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct ResolvedDdnsEntry {
-    pub url: String,
+    pub resolved: String,
     pub original: DdnsEntry,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct ResolveFailed {
-    pub template_url: String,
+    pub template: String,
     pub message: String,
 }
 
 impl Display for ResolvedDdnsEntry {
     fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
-        write!(f, "{}", self.url)
+        write!(f, "{}", self.resolved)
     }
 }
 
 impl Display for ResolveFailed {
     fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
-        write!(f, "{}", self.template_url)
+        write!(f, "{}", self.template)
     }
 }
 
@@ -48,26 +48,26 @@ pub fn resolve(entries: &Vec<DdnsEntry>, address_defs: &HashMap<String, IpAddres
 }
 
 fn resolve_entry(entry: &DdnsEntry, resolved_addresses: &HashMap<String, IpAddr>) -> Result<ResolvedDdnsEntry, ResolveFailed> {
-    let mut resolved_url = entry.url.clone();
+    let mut resolved = entry.template().clone();
     for (addr_key, addr_value) in resolved_addresses.iter() {
         let placeholder = format!("{{{}}}", addr_key);
-        if resolved_url.contains(&placeholder) {
-            resolved_url = resolved_url.replace(&placeholder, &addr_value.to_string());
+        if resolved.contains(&placeholder) {
+            resolved = resolved.replace(&placeholder, &addr_value.to_string());
         }
     }
 
     lazy_static! {
-        static ref PLACEHOLDER: Regex = Regex::new(r"\{[^\}]*\}").unwrap();
+        static ref PLACEHOLDER: Regex = Regex::new(r"\{[^\}\s]*\}").unwrap();
     }
 
-    if PLACEHOLDER.is_match(&resolved_url) {
+    if PLACEHOLDER.is_match(&resolved) {
         Err(ResolveFailed {
-            template_url: entry.url.clone(),
+            template: entry.template().clone(),
             message: "Some placeholders for IP addresses could not be resolved to actual addresses.".to_string(),
         })
     } else {
         Ok(ResolvedDdnsEntry {
-            url: resolved_url,
+            resolved: resolved,
             original: entry.clone(),
         })
     }
@@ -106,24 +106,24 @@ fn resolve_addresses<'a>(address_defs: &HashMap<String, IpAddress>,
 #[cfg(test)]
 mod tests {
     use super::*;
-    use config::{IpAddressDerived, IpAddressStatic, IpAddressFromParameter};
+    use config::{IpAddressDerived, IpAddressStatic, IpAddressFromParameter, DdnsEntryHttp};
 
     fn some_host_entry() -> DdnsEntry {
-        DdnsEntry {
+        DdnsEntry::HTTP(DdnsEntryHttp {
             url: "http://someHost/path/{ip1}?update={other_ip}".to_string(),
             username: Some("user".to_string()),
             password: Some("pass".to_string()),
             ignore_error: true,
-        }
+        })
     }
 
     fn other_host_entry() -> DdnsEntry {
-        DdnsEntry {
+        DdnsEntry::HTTP(DdnsEntryHttp {
             url: "http://otherHost?ip={other_ip}".to_string(),
             username: None,
             password: None,
             ignore_error: false,
-        }
+        })
     }
 
     fn some_entries() -> Vec<DdnsEntry> {
@@ -144,10 +144,10 @@ mod tests {
         address_values.insert("ip1".to_string(), "203.0.113.92".parse().unwrap());
 
         let expected = vec![Ok(ResolvedDdnsEntry {
-            url: "http://someHost/path/2001:db8:123:beef::42?update=203.0.113.25".to_string(),
+            resolved: "http://someHost/path/2001:db8:123:beef::42?update=203.0.113.25".to_string(),
             original: some_host_entry(),
         }), Ok(ResolvedDdnsEntry {
-            url: "http://otherHost?ip=203.0.113.25".to_string(),
+            resolved: "http://otherHost?ip=203.0.113.25".to_string(),
             original: other_host_entry(),
         })];
 
@@ -170,10 +170,10 @@ mod tests {
         address_values.insert("different_parameter".to_string(), "2001:DB8:a2f3::29".parse().unwrap());
 
         let expected = vec![Ok(ResolvedDdnsEntry {
-            url: "http://someHost/path/203.0.113.39?update=2001:db8:a2f3::29".to_string(),
+            resolved: "http://someHost/path/203.0.113.39?update=2001:db8:a2f3::29".to_string(),
             original: some_host_entry(),
         }), Ok(ResolvedDdnsEntry {
-            url: "http://otherHost?ip=2001:db8:a2f3::29".to_string(),
+            resolved: "http://otherHost?ip=2001:db8:a2f3::29".to_string(),
             original: other_host_entry(),
         })];
 
@@ -217,10 +217,10 @@ mod tests {
         }));
 
         let expected = vec![Ok(ResolvedDdnsEntry {
-            url: "http://someHost/path/203.0.113.42?update=2001:db8:a2f3:9999:4bcf:78ff:feac:8bd9".to_string(),
+            resolved: "http://someHost/path/203.0.113.42?update=2001:db8:a2f3:9999:4bcf:78ff:feac:8bd9".to_string(),
             original: some_host_entry(),
         }), Ok(ResolvedDdnsEntry {
-            url: "http://otherHost?ip=2001:db8:a2f3:9999:4bcf:78ff:feac:8bd9".to_string(),
+            resolved: "http://otherHost?ip=2001:db8:a2f3:9999:4bcf:78ff:feac:8bd9".to_string(),
             original: other_host_entry(),
         })];
 
@@ -242,8 +242,8 @@ mod tests {
 
         assert_eq!(actual.len(), 2);
         assert!(actual[0].is_err());
-        let template_url = &actual[0].as_ref().unwrap_err().template_url;
-        assert_eq!(template_url, "http://someHost/path/{ip1}?update={other_ip}");
+        let template = &actual[0].as_ref().unwrap_err().template;
+        assert_eq!(template, "http://someHost/path/{ip1}?update={other_ip}");
         assert!(actual[1].is_ok());
     }
 
@@ -263,10 +263,10 @@ mod tests {
 
         assert_eq!(actual.len(), 2);
         assert!(actual[0].is_err());
-        let template_url0 = &actual[0].as_ref().unwrap_err().template_url;
-        assert_eq!(template_url0, "http://someHost/path/{ip1}?update={other_ip}");
+        let template0 = &actual[0].as_ref().unwrap_err().template;
+        assert_eq!(template0, "http://someHost/path/{ip1}?update={other_ip}");
         assert!(actual[1].is_err());
-        let template_url1 = &actual[1].as_ref().unwrap_err().template_url;
-        assert_eq!(template_url1, "http://otherHost?ip={other_ip}");
+        let template1 = &actual[1].as_ref().unwrap_err().template;
+        assert_eq!(template1, "http://otherHost?ip={other_ip}");
     }
 }

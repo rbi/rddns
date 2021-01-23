@@ -52,7 +52,25 @@ pub struct TriggerTimed {
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Deserialize)]
-pub struct DdnsEntry {
+#[serde(tag = "type")]
+pub enum DdnsEntry {
+    #[serde(rename = "http")]
+    HTTP(DdnsEntryHttp),
+    #[serde(rename = "file")]
+    FILE(DdnsEntryFile)
+}
+
+impl DdnsEntry {
+    pub fn template(&self) -> &String {
+        match self {
+            DdnsEntry::HTTP(http)  => &http.url,
+            DdnsEntry::FILE(file) => &file.replace
+        }
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Deserialize)]
+pub struct DdnsEntryHttp {
     pub url: String,
     pub username: Option<String>,
     pub password: Option<String>,
@@ -60,9 +78,21 @@ pub struct DdnsEntry {
     pub ignore_error: bool
 }
 
-impl Display for DdnsEntry {
+impl Display for DdnsEntryHttp {
     fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
         write!(f, "{}", self.url)
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Deserialize)]
+pub struct DdnsEntryFile {
+    pub file: String,
+    pub replace: String,
+}
+
+impl Display for DdnsEntryFile {
+    fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
+        write!(f, "file: {}, replace: {} ", self.file, self.replace)
     }
 }
 
@@ -162,13 +192,20 @@ mod tests {
         host_entry = "some_static_addr"
 
         [[ddns_entry]]
+        type = "http"
         url = "http://example.com/{addr1}"
         username = "someUser"
         password = "somePassword"
         ignore_error = true
 
         [[ddns_entry]]
+        type = "http"
         url = "https://other.org/x?y={some_static_addr}"
+
+        [[ddns_entry]]
+        type = "file"
+        file = "/etc/somewhere.conf"
+        replace = "myAddr={some_static_addr}"
         "#;
 
         let (_temp_dir, config_file_path) = create_temp_file(config_file_content);
@@ -199,18 +236,22 @@ mod tests {
             })],
             ip_addresses,
             ddns_entries: vec![
-                DdnsEntry {
+                DdnsEntry::HTTP(DdnsEntryHttp {
                     url: "http://example.com/{addr1}".to_string(),
                     username: Some("someUser".to_string()),
                     password: Some("somePassword".to_string()),
                     ignore_error: true,
-                },
-                DdnsEntry {
+                }),
+                DdnsEntry::HTTP(DdnsEntryHttp {
                     url: "https://other.org/x?y={some_static_addr}".to_string(),
                     username: None,
                     password: None,
                     ignore_error: false,
-                }
+                }),
+                DdnsEntry::FILE(DdnsEntryFile {
+                    file: "/etc/somewhere.conf".to_string(),
+                    replace: "myAddr={some_static_addr}".to_string()
+                })
             ],
         };
         let actual = read_config(&config_file_path)
