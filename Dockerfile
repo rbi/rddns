@@ -1,4 +1,4 @@
-FROM rust as builder
+FROM rust:1.34.2 as builder
 LABEL maintainer "raik@voidnode.de"
 
 ARG TARGET_PLATFORM=x86_64-unknown-linux-musl
