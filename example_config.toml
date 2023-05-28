@@ -15,8 +15,9 @@
 # IP address sources of type "parameter" take the current IP address from parameters passed when triggerering an update.
 #
 # In server mode these parameters must be passed as HTTP query parameter to the rddns HTTP server. They must be passed
-# in the form "ip[<parameter>]=<address>" where <parameter> is the name of the  parameter that is configured with the
-# "parameter" option and <address> is the current address.
+# in the form "ip[<parameter>]=<address>" where <parameter> is the name of the parameter that is configured with the
+# "parameter" option and <address> is the current address. A second form that is possible is
+# "ip.base64[<parameter>]=<address>". When this form is used the <address> value is expected to be base64 encoded.
 #
 # In update mode these parameters musst be passed as command line arguments. They must have the form of
 # "--ip <parameter>=<address>" whith <parameter> and <address> having the same semantics as in server mode.

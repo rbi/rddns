@@ -124,13 +124,34 @@ fn extract_address_parameters(query: &Option<&str>) -> HashMap<String, IpAddr> {
     map
 }
 
-
 fn to_address_param(param: &str) -> Option<(String, String)> {
     lazy_static! {
         static ref IP_PARAM: Regex = Regex::new(r"ip\[([^\]]+)]=(.+)").unwrap();
+        static ref IP_BASE64_PARAM: Regex = Regex::new(r"ip.base64\[([^\]]+)]=(.+)").unwrap();
     }
 
-    IP_PARAM.captures(param).map(|groups| (groups[1].to_string(), groups[2].to_string()))
+    let result = IP_PARAM.captures(param).map(|groups| (groups[1].to_string(), groups[2].to_string()));
+    if result.is_some() {
+        return result;
+    }
+
+    IP_BASE64_PARAM.captures(param).and_then(|groups| base64_decode(&groups[2]).map( |resolved| (groups[1].to_string(), resolved)))
+}
+
+fn base64_decode(encoded: &str) -> Option<String> {
+    match base64::decode(encoded) {
+        Ok(decoded) => match String::from_utf8(decoded) {
+            Ok(decoded_string) => Some(decoded_string),
+            Err(_) => {
+                warn!("Could not base64 decode an IP address parameter.");
+                None
+            }
+        },
+        Err(_) => {
+            warn!("Could not base64 decode an IP address parameter.");
+            None
+        }
+    }
 }
 
 #[cfg(test)]
@@ -142,9 +163,10 @@ mod tests {
         let mut expected = HashMap::new();
         expected.insert("first".to_string(), "2001:DB8:123:abcd::1".parse().unwrap());
         expected.insert("other".to_string(), "203.0.113.85".parse().unwrap());
+        expected.insert("b64encoded".to_string(), "11.22.33.44".parse().unwrap());
 
         let query = Some("ip[first]=2001:DB8:123:abcd::1&abitrary_param=abc&ip[other]=203.0.113.85\
-&broken_param&ip[=broken&ip=broken_too");
+&broken_param&ip[=broken&ip=broken_too&ip.base64[b64encoded]=MTEuMjIuMzMuNDQ=");
         let actual = extract_address_parameters(&query);
 
         assert_eq!(actual, expected);
