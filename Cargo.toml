@@ -2,13 +2,14 @@
 name = "rddns"
 version = "0.3.0"
 authors = ["Raik Bieniek <dev@voidnode.de>"]
+edition = "2021"
 
 [dependencies]
-hyper = "0.12.23"
-hyper-rustls = "0.16.1"
-futures = "0.1.25"
-tokio = "0.1.15"
-tokio-timer = "0.2.10"
+hyper = {version = "0.14.26", features = ["server", "client"] }
+hyper-rustls = "0.24.0"
+futures = "0.3.28"
+futures-util = "0.3.28"
+tokio = { version = "1.28.2", features = ["fs", "rt-multi-thread", "time"] }
 toml = "0.4.10"
 serde = "1.0.84"
 serde_derive = "1.0.84"

@@ -2,11 +2,13 @@ use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::{Arc, Mutex};
 
-use futures::future::{result, Future, ok, err, join_all};
+use futures::future::Future;
+use futures_util::StreamExt;
+use futures_util::stream::FuturesUnordered;
 
-use update_executer::update_dns;
-use resolver::{resolve_config, ResolvedDdnsEntry, ResolveFailed};
-use config::{Config, DdnsEntry};
+use super::update_executer::update_dns;
+use super::resolver::{resolve_config, ResolvedDdnsEntry, ResolveFailed};
+use super::config::{Config, DdnsEntry};
 
 #[derive(Clone, Debug)]
 pub struct Updater {
@@ -22,17 +24,17 @@ impl Updater {
         }
     }
 
-    pub fn do_update(&self, addresses: &HashMap<String, IpAddr>) -> impl Future<Item=(), Error=String> + Send {
+    pub async fn do_update(&self, addresses: HashMap<String, IpAddr>) -> Result<(), String> {
         debug!("updating DDNS entries");
 
-        let work = resolve_config(&self.config, addresses).iter()
+        let work = resolve_config(&self.config, &addresses).iter()
             .filter(|entry| self.filter_unchanged(entry))
-            .map(execute_resolved_dns_entry)
+            .map(|resolved| execute_resolved_dns_entry(resolved))
             .map(|executed| self.cache_successfull(executed))
             .map(error_to_ok)
-            .collect::<Vec<_>>();
+            .collect::<FuturesUnordered<_>>().collect().await;
 
-        join_all(work).and_then(combine_errors)
+        combine_errors(work)
     }
 
     fn filter_unchanged(&self, resolved: &Result<ResolvedDdnsEntry, ResolveFailed>) -> bool {
@@ -51,47 +53,42 @@ impl Updater {
         filter
     }
 
-    fn cache_successfull(&self, executed: impl Future<Item=ResolvedDdnsEntry, Error=String>) -> impl Future<Item=ResolvedDdnsEntry, Error=String> {
-        let cache = self.cache.clone();
-        executed.inspect(move |resolved| {
-            let mut cache = cache.lock().unwrap();
-            cache.insert(resolved.original.clone(), resolved.clone());
-        })
+    async fn cache_successfull(&self, executed: impl Future<Output = Result<ResolvedDdnsEntry, String>>) -> Result<ResolvedDdnsEntry, String> {
+        let resolved = executed.await?;
+
+        let mut cache = self.cache.lock().unwrap();
+        cache.insert(resolved.original.clone(), resolved.clone());
+        Ok(resolved)
     }
 }
 
-fn execute_resolved_dns_entry(resolved: &Result<ResolvedDdnsEntry, ResolveFailed>) -> impl Future<Item=ResolvedDdnsEntry, Error=String> {
-    let resolved = resolved.clone();
-    result(resolved)
-        .map_err(|e| format!("Updating DDNS \"{}\" failed. Reason: {}", e, e.message))
-        .and_then(|ref resolved| {
-            let resolved2 = resolved.clone();
-            let resolved3 = resolved.clone();
-            update_dns(resolved)
-                .map(move |_| resolved2)
-                .inspect( |resolved| info!("Successfully updated DDNS entry {}", resolved))
-                .map_err(move |error_msg| format!("Updating DDNS \"{}\" failed. Reason: {}", resolved3, error_msg))
-        })
+async fn execute_resolved_dns_entry(resolved: &Result<ResolvedDdnsEntry, ResolveFailed>) -> Result<ResolvedDdnsEntry, String> {
+    let resolved = resolved.clone().map_err(|e| format!("Updating DDNS \"{}\" failed. Reason: {}", e, e.message))?;
+    let resolved2 = resolved.clone();
+    let resolved3 = resolved.clone();
+
+    update_dns(&resolved).await.map_err(move |error_msg| format!("Updating DDNS \"{}\" failed. Reason: {}", resolved2, error_msg))?;
+    info!("Successfully updated DDNS entry {}", resolved3);
+    Ok(resolved)
 }
 
 
-fn error_to_ok<T>(executed: impl Future<Item=T, Error=String>) -> impl Future<Item=String, Error=String> {
-    executed
-        .then(|result|
-              ok(match result {
-                  Ok(_) => "".to_owned(),
-                  Err(error_msg) => {
-                      error!("{}", error_msg);
-                      error_msg
-                  }}))
+async fn error_to_ok<T>(executed: impl Future<Output=Result<T, String>>) -> String {
+    match executed.await {
+        Ok(_) => "".to_owned(),
+        Err(error_msg) => {
+            error!("{}", error_msg);
+            error_msg
+        }
+    }
 }
 
-fn combine_errors(results: Vec<String>) -> impl Future<Item=(), Error=String> {
+fn combine_errors(results: Vec<String>) -> Result<(), String> {
     let error = results.join("\n");
 
     if error.is_empty() || error == "\n" {
-        ok(())
+        Ok(())
     } else {
-        err(error.to_string())
+        Err(error.to_string())
     }
 }

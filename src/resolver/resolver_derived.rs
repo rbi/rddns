@@ -1,5 +1,5 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use config::IpAddressDerived;
+use crate::config::IpAddressDerived;
 use std::collections::HashMap;
 
 pub fn resolve_derived(config: &IpAddressDerived, address_actual: &HashMap<String, IpAddr>) -> Option<IpAddr> {

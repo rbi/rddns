@@ -6,7 +6,7 @@ use std::fmt::{Display, Formatter};
 use std::net::IpAddr;
 use regex::Regex;
 
-use config::{Config, IpAddress, DdnsEntry};
+use super::config::{Config, IpAddress, DdnsEntry};
 use self::resolver_derived::resolve_derived;
 use self::resolver_interface::resolve_interface;
 
@@ -106,7 +106,7 @@ fn resolve_addresses<'a>(address_defs: &HashMap<String, IpAddress>,
 #[cfg(test)]
 mod tests {
     use super::*;
-    use config::{IpAddressDerived, IpAddressStatic, IpAddressFromParameter, DdnsEntryHttp};
+    use crate::config::{IpAddressDerived, IpAddressStatic, IpAddressFromParameter, DdnsEntryHttp};
 
     fn some_host_entry() -> DdnsEntry {
         DdnsEntry::HTTP(DdnsEntryHttp {

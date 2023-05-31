@@ -18,7 +18,7 @@ fn prints_to_console_on_request() {
     let uri = rddns.get_url().parse().unwrap();
     let request = client.get(uri);
 
-    let mut rt = Runtime::new().unwrap();
+    let rt = Runtime::new().unwrap();
 
     match rt.block_on(request) {
         Ok(response) => {
@@ -28,6 +28,6 @@ fn prints_to_console_on_request() {
             assert!(rddns.stdout_readln().ends_with("Listening on port 3092\n"));
             assert!(rddns.is_running().unwrap())
         }
-        Err(err) => panic!(err)
+        Err(err) => panic!("{}", err)
     }
 }

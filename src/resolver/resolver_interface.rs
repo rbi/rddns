@@ -1,7 +1,7 @@
 use std::net::IpAddr;
 use pnet::datalink::{interfaces, NetworkInterface};
 use ipnetwork::IpNetwork;
-use config::IpAddressInterface;
+use crate::config::IpAddressInterface;
 
 pub fn resolve_interface(config: &IpAddressInterface) -> Option<IpAddr> {
     config.network.parse()
