@@ -37,7 +37,7 @@ use futures_util::stream::FuturesUnordered;
 use std::collections::HashMap;
 use std::net::IpAddr;
 
-use simplelog::{SimpleLogger, TermLogger, CombinedLogger, LevelFilter, Config as SimpleLogConfig};
+use simplelog::{SimpleLogger, TermLogger, LevelFilter, Config as SimpleLogConfig, TerminalMode, ColorChoice};
 
 use config::{read_config, Config, Trigger};
 use command_line::{ExecutionMode, parse_command_line};
@@ -72,11 +72,15 @@ fn main() -> Result<(), String> {
 }
 
 fn init_logging() {
-    let term_logger = TermLogger::new(LevelFilter::Info, SimpleLogConfig::default());
-    let logger = if term_logger.is_some() {
-        CombinedLogger::init(vec![term_logger.unwrap()])
-    } else {
-        SimpleLogger::init(LevelFilter::Info, SimpleLogConfig::default())
+    let term_logger = TermLogger::init(LevelFilter::Info, SimpleLogConfig::default(), TerminalMode::Mixed, ColorChoice::Auto);
+    let logger = 
+     match term_logger {
+        Ok(_) => {
+            term_logger
+        }
+        Err(_) => {
+            SimpleLogger::init(LevelFilter::Info, SimpleLogConfig::default())
+        }
     };
     if logger.is_err() {
         eprintln!("Failed to initialize logging framework. Nothing will be logged. Error was: {}", logger.unwrap_err());

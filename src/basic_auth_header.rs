@@ -1,4 +1,4 @@
-use base64::{encode_config_buf, decode};
+use base64::{Engine as _, engine::general_purpose};
 use regex::Regex;
 use std::str::from_utf8;
 use std::convert::TryFrom;
@@ -36,7 +36,7 @@ impl TryFrom<&str> for BasicAuth {
         }
 
         match BASIC_HEADER.captures(value) {
-            Some(caps) => match decode(&caps[1]) {
+            Some(caps) => match general_purpose::STANDARD.decode(&caps[1]) {
                 Ok(decoded) => match from_utf8(&decoded) {
                     Ok(decoded) => Ok(BasicAuth::decoded_to_basic_auth(decoded)),
                     Err(err) => Err(format!("Basic auth header decoding failed: {}", err.to_string()))
@@ -60,7 +60,7 @@ pub fn to_auth_header_value(username: &str, password: &str) -> String {
 
 pub fn to_auth_header_value_no_password(username: &str) -> String {
     let mut buffer = String::from("Basic ");
-    encode_config_buf(username, base64::STANDARD, &mut buffer);
+    general_purpose::STANDARD.encode_string(username, &mut buffer);
     buffer
 }
 

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::net::IpAddr;
 use std::path::PathBuf;
 use regex::Regex;
-use clap::{Arg, App, ArgMatches, AppSettings, SubCommand};
+use clap::{Arg, ArgAction, Command};
 
 pub struct CommandLine {
     pub addresses: HashMap<String, IpAddr>,
@@ -16,35 +16,32 @@ pub enum ExecutionMode {
 }
 
 pub fn parse_command_line() -> CommandLine {
-    let matches = App::new("rddns")
-        .author(crate_authors!())
-        .version(crate_version!())
-        .setting(AppSettings::SubcommandRequired)
-        .setting(AppSettings::VersionlessSubcommands)
-        .arg(Arg::with_name("config")
-            .short("c")
+    let matches = command!()
+        .subcommand_required(true)
+        .arg(Arg::new("config")
+            .short('c')
             .long("config")
             .help("The path to the configuration file.")
-            .takes_value(true)
+            .action(ArgAction::Set)
             .required(true))
-        .subcommand(SubCommand::with_name("update")
+        .subcommand(Command::new("update")
             .about("Triggers a single update of all DynDNS entries.")
-            .arg(Arg::with_name("ip")
+            .arg(Arg::new("ip")
                 .long("ip")
-                .short("i")
+                .short('i')
                 .help("The current IP addresses for IP address configurations of type \"parameter\".\
 They must have the form [name]=[address], e.g. my_parameter=203.0.113.25 .")
-                .takes_value(true)
-                .multiple(true)
-                .use_delimiter(true)
-                .validator(validate_ip_parameter)))
-        .subcommand(SubCommand::with_name("trigger")
+                .action(ArgAction::Append)
+                .value_parser(parse_ip_parameter)))
+        .subcommand(Command::new("trigger")
             .about("Starts and waits for configured triggers for updating DynDNS entries to occure."))
         .get_matches();
 
     CommandLine {
         addresses: match matches.subcommand_matches("update") {
-            Some(update_matches) => parse_ip_parameters(update_matches),
+            Some(update_matches) => update_matches.get_many::<(String, IpAddr)>("ip")
+                .map(|val| val.map(|val | val.clone()).collect())
+                .unwrap_or_else(HashMap::new),
             _ => HashMap::new()
         },
         execution_mode: match matches.subcommand_name() {
@@ -52,23 +49,11 @@ They must have the form [name]=[address], e.g. my_parameter=203.0.113.25 .")
             Some("trigger") => ExecutionMode::TRIGGER,
             _ => panic!("BUG: No or unknown sub command was passed. This should not be possible.")
         },
-        config_file: get_config_file(matches.value_of("config").unwrap()),
+        config_file: get_config_file(matches.get_one::<String>("config").unwrap()),
     }
 }
 
-fn validate_ip_parameter(value: String) -> Result<(), String> {
-    parse_ip_parameter(value).map(|_| ())
-}
-
-fn parse_ip_parameters(arguments: &ArgMatches) -> HashMap<String, IpAddr> {
-    arguments.values_of("ip")
-        .map(|values| values
-            .map(|value| parse_ip_parameter(value.to_string()).unwrap())
-            .collect())
-        .unwrap_or_else(|| HashMap::new())
-}
-
-fn parse_ip_parameter(value: String) -> Result<(String, IpAddr), String> {
+fn parse_ip_parameter(value: &str) -> Result<(String, IpAddr), String> {
     lazy_static! {
         static ref IP_PARAM: Regex = Regex::new(r"([^=]+)=(.+)").unwrap();
     }

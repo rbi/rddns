@@ -8,6 +8,7 @@ use hyper::header::{HeaderMap, WWW_AUTHENTICATE, AUTHORIZATION};
 use regex::Regex;
 use std::net::{AddrParseError, IpAddr};
 use std::convert::TryFrom;
+use base64::{Engine as _, engine::general_purpose};
 
 use crate::config::TriggerHttp;
 use crate::basic_auth_header::BasicAuth;
@@ -38,6 +39,7 @@ async fn call<Fut>(req: Request<Body>, update_callback: impl Fn(HashMap<String, 
                            server_config: TriggerHttp) -> Result<Response<Body>, hyper::http::Error>
   where Fut: Future<Output=Result<(), String>> {
     let authorized = check_authorisation(req.headers(), &server_config);
+    info!("Received request authorized: {}, uri: {}", authorized.is_ok(), req.uri());
     match authorized {
         Ok(_) => {
             let ip_parameters = extract_address_parameters(&req.uri().query());
@@ -70,7 +72,7 @@ fn check_authorisation(headers: &HeaderMap, config: &TriggerHttp) -> Result<(), 
                     debug!("{}", err);
                     ()
                 }))
-                .and_then(|auth|
+                .and_then(|auth| {
                     if auth.username.eq(username) && match config.password {
                         Some(ref config_password) => match auth.password {
                             Some(ref auth_password) => config_password.eq(auth_password),
@@ -81,7 +83,7 @@ fn check_authorisation(headers: &HeaderMap, config: &TriggerHttp) -> Result<(), 
                         Ok(())
                     } else {
                         Err(())
-                    })
+                    }})
         }
         None => Ok(())
     }
@@ -112,7 +114,7 @@ fn extract_address_parameters(query: &Option<&str>) -> HashMap<String, IpAddr> {
 fn to_address_param(param: &str) -> Option<(String, String)> {
     lazy_static! {
         static ref IP_PARAM: Regex = Regex::new(r"ip\[([^\]]+)]=(.+)").unwrap();
-        static ref IP_BASE64_PARAM: Regex = Regex::new(r"ip.base64\[([^\]]+)]=(.+)").unwrap();
+        static ref IP_BASE64_PARAM: Regex = Regex::new(r"ip\.base64\[([^\]]+)]=(.+)").unwrap();
     }
 
     let result = IP_PARAM.captures(param).map(|groups| (groups[1].to_string(), groups[2].to_string()));
@@ -124,7 +126,7 @@ fn to_address_param(param: &str) -> Option<(String, String)> {
 }
 
 fn base64_decode(encoded: &str) -> Option<String> {
-    match base64::decode(encoded) {
+    match general_purpose::STANDARD.decode(encoded) {
         Ok(decoded) => match String::from_utf8(decoded) {
             Ok(decoded_string) => Some(decoded_string),
             Err(_) => {
@@ -185,7 +187,7 @@ mod tests {
 
         let mut headers_with_auth = HeaderMap::new();
         // some_user:some_password
-        headers_with_auth.append(AUTHORIZATION, "Basic c29tZV91c2VyOnNvbWVfcGFzc3dvcmQ".parse().unwrap());
+        headers_with_auth.append(AUTHORIZATION, "Basic c29tZV91c2VyOnNvbWVfcGFzc3dvcmQ=".parse().unwrap());
         assert!(check_authorisation(&headers_with_auth, &conf).is_ok());
 
         let headers_without_auth = HeaderMap::new();
@@ -203,7 +205,7 @@ mod tests {
 
         let mut headers = HeaderMap::new();
         // some_user:some_password
-        headers.append(AUTHORIZATION, "Basic c29tZV91c2VyOnNvbWVfcGFzc3dvcmQ".parse().unwrap());
+        headers.append(AUTHORIZATION, "Basic c29tZV91c2VyOnNvbWVfcGFzc3dvcmQ=".parse().unwrap());
         assert!(check_authorisation(&headers, &conf).is_ok());
     }
 
