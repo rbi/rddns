@@ -69,6 +69,12 @@ impl DdnsEntry {
     }
 }
 
+impl Display for DdnsEntry {
+    fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
+        write!(f, "{}", self.template())
+    }
+}
+
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Deserialize)]
 pub struct DdnsEntryHttp {
     pub url: String,

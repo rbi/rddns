@@ -20,6 +20,7 @@ pub struct ResolvedDdnsEntry {
 pub struct ResolveFailed {
     pub template: String,
     pub message: String,
+    pub original: DdnsEntry,
 }
 
 impl Display for ResolvedDdnsEntry {
@@ -76,6 +77,7 @@ fn resolve_entry(
             message:
                 "Some placeholders for IP addresses could not be resolved to actual addresses."
                     .to_string(),
+            original: entry.clone(),
         })
     } else {
         Ok(ResolvedDdnsEntry {

@@ -12,13 +12,14 @@ use std::net::{AddrParseError, IpAddr};
 
 use crate::basic_auth_header::BasicAuth;
 use crate::config::TriggerHttp;
+use crate::updater::UpdateResults;
 
 pub async fn create_server<Fut>(
     update_callback: impl Fn(HashMap<String, IpAddr>) -> Fut + Send + Sync + Clone + 'static,
     server_config: TriggerHttp,
 ) -> Result<(), String>
 where
-    Fut: Future<Output = Result<(), String>> + Send + 'static,
+    Fut: Future<Output = UpdateResults> + Send + 'static,
 {
     let port = server_config.port;
     match format!("[::]:{}", port)
@@ -52,7 +53,7 @@ async fn call<Fut>(
     server_config: TriggerHttp,
 ) -> Result<Response<Body>, hyper::http::Error>
 where
-    Fut: Future<Output = Result<(), String>>,
+    Fut: Future<Output = UpdateResults>,
 {
     let authorized = check_authorisation(req.headers(), &server_config);
     info!(
@@ -65,13 +66,21 @@ where
             let ip_parameters = extract_address_parameters(&req.uri().query());
             let update_result = (update_callback)(ip_parameters).await;
 
-            let return_code = match update_result {
-                Ok(_) => StatusCode::OK,
-                Err(_) => StatusCode::BAD_GATEWAY,
+            let return_code = match update_result.errors {
+                Some(_) => StatusCode::INTERNAL_SERVER_ERROR,
+                None => StatusCode::OK,
             };
-            let message = match update_result {
-                Ok(_) => "success".to_string(),
-                Err(err) => err,
+
+            let mut message_parts = Vec::with_capacity(2);
+            if let Some(err) = update_result.errors {
+                message_parts.push(err);
+            }
+            if let Some(warn) = update_result.warnings {
+                message_parts.push(warn);
+            }
+            let message = match message_parts.len() {
+                0 => "success".to_string(),
+                _ => message_parts.join("\n"),
             };
 
             Response::builder()

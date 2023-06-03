@@ -2,18 +2,28 @@ use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::{Arc, Mutex};
 
-use futures::future::Future;
 use futures_util::stream::FuturesUnordered;
 use futures_util::StreamExt;
 
 use super::config::{Config, DdnsEntry};
-use super::resolver::{resolve_config, ResolveFailed, ResolvedDdnsEntry};
+use super::resolver::{resolve_config, ResolvedDdnsEntry};
 use super::update_executer::update_dns;
 
 #[derive(Clone, Debug)]
 pub struct Updater {
     config: Config,
     cache: Arc<Mutex<HashMap<DdnsEntry, ResolvedDdnsEntry>>>,
+}
+
+pub struct UpdateResults {
+    pub warnings: Option<String>,
+    pub errors: Option<String>,
+}
+
+enum UpdateResult {
+    Ok,
+    Warning(String),
+    Error(String),
 }
 
 impl Updater {
@@ -24,28 +34,37 @@ impl Updater {
         }
     }
 
-    pub async fn do_update(&self, addresses: HashMap<String, IpAddr>) -> Result<(), String> {
+    pub async fn do_update(&self, addresses: HashMap<String, IpAddr>) -> UpdateResults {
         debug!("updating DDNS entries");
 
         let work = resolve_config(&self.config, &addresses)
             .iter()
-            .filter(|entry| self.filter_unchanged(entry))
-            .map(|resolved| execute_resolved_dns_entry(resolved))
-            .map(|executed| self.cache_successfull(executed))
-            .map(error_to_ok)
+            .map(|entry| async move {
+                match entry {
+                    Ok(resolved) => self.handle_resolved(resolved.clone()).await,
+                    Err(err) => Some(error_to_update_result(&err.original, err.message.clone())),
+                }
+            })
             .collect::<FuturesUnordered<_>>()
-            .collect()
+            .collect::<Vec<_>>()
             .await;
 
-        combine_errors(work)
+        combine_results(work)
     }
 
-    fn filter_unchanged(&self, resolved: &Result<ResolvedDdnsEntry, ResolveFailed>) -> bool {
-        if resolved.is_err() {
-            return true;
+    async fn handle_resolved(&self, resolved: ResolvedDdnsEntry) -> Option<UpdateResult> {
+        if self.is_unchanged(&resolved) {
+            return None;
         }
+        let executed = execute_resolved_dns_entry(&resolved).await;
+        if let UpdateResult::Ok = executed {
+            self.cache(resolved);
+        }
+        Some(executed)
+    }
+
+    fn is_unchanged(&self, resolved: &ResolvedDdnsEntry) -> bool {
         let cache = self.cache.lock().unwrap();
-        let resolved = resolved.as_ref().unwrap();
         let filter = cache
             .get(&resolved.original)
             .map(|last| last != resolved)
@@ -61,53 +80,66 @@ impl Updater {
         filter
     }
 
-    async fn cache_successfull(
-        &self,
-        executed: impl Future<Output = Result<ResolvedDdnsEntry, String>>,
-    ) -> Result<ResolvedDdnsEntry, String> {
-        let resolved = executed.await?;
-
+    fn cache(&self, executed: ResolvedDdnsEntry) {
         let mut cache = self.cache.lock().unwrap();
-        cache.insert(resolved.original.clone(), resolved.clone());
-        Ok(resolved)
+        cache.insert(executed.original.clone(), executed.clone());
     }
 }
 
-async fn execute_resolved_dns_entry(
-    resolved: &Result<ResolvedDdnsEntry, ResolveFailed>,
-) -> Result<ResolvedDdnsEntry, String> {
-    let resolved = resolved
-        .clone()
-        .map_err(|e| format!("Updating DDNS \"{}\" failed. Reason: {}", e, e.message))?;
-    let resolved2 = resolved.clone();
-    let resolved3 = resolved.clone();
-
-    update_dns(&resolved).await.map_err(move |error_msg| {
-        format!(
-            "Updating DDNS \"{}\" failed. Reason: {}",
-            resolved2, error_msg
-        )
-    })?;
-    info!("Successfully updated DDNS entry {}", resolved3);
-    Ok(resolved)
-}
-
-async fn error_to_ok<T>(executed: impl Future<Output = Result<T, String>>) -> String {
-    match executed.await {
-        Ok(_) => "".to_owned(),
-        Err(error_msg) => {
-            error!("{}", error_msg);
-            error_msg
-        }
-    }
-}
-
-fn combine_errors(results: Vec<String>) -> Result<(), String> {
-    let error = results.join("\n");
-
-    if error.is_empty() || error == "\n" {
-        Ok(())
+fn error_to_update_result(entry: &DdnsEntry, error_message: String) -> UpdateResult {
+    let allowed_to_fail = match entry {
+        DdnsEntry::HTTP(http_entry) => http_entry.ignore_error,
+        _ => false,
+    };
+    if allowed_to_fail {
+        info!(
+            "Updating DDNS \"{}\" failed but is allowed to fail. Reason: {}",
+            entry, error_message
+        );
+        UpdateResult::Warning(error_message)
     } else {
-        Err(error.to_string())
+        warn!(
+            "Updating DDNS \"{}\" failed. Reason: {}",
+            entry, error_message
+        );
+        UpdateResult::Error(error_message)
+    }
+}
+
+async fn execute_resolved_dns_entry(resolved: &ResolvedDdnsEntry) -> UpdateResult {
+    let result = update_dns(&resolved).await;
+    if let Err(error_msg) = result {
+        error_to_update_result(&resolved.original, error_msg)
+    } else {
+        info!("Successfully updated DDNS entry {}", resolved);
+        UpdateResult::Ok
+    }
+}
+
+fn combine_results(results: Vec<Option<UpdateResult>>) -> UpdateResults {
+    let sorted = results
+        .into_iter()
+        .fold((vec![], vec![]), |mut result, element| {
+            if let Some(element) = element {
+                if let UpdateResult::Warning(warn) = element {
+                    result.0.push(warn);
+                } else if let UpdateResult::Error(error) = element {
+                    result.1.push(error);
+                }
+            }
+            result
+        });
+
+    UpdateResults {
+        warnings: if sorted.0.is_empty() {
+            None
+        } else {
+            Some(sorted.0.join("\n"))
+        },
+        errors: if sorted.1.is_empty() {
+            None
+        } else {
+            Some(sorted.1.join("\n"))
+        },
     }
 }

@@ -70,7 +70,11 @@ fn main() -> Result<(), String> {
         }
         ExecutionMode::UPDATE => {
             let updater = Updater::new(config.clone());
-            rt.block_on(updater.do_update(cmd_args.addresses))
+            let result = rt.block_on(updater.do_update(cmd_args.addresses));
+            match result.errors {
+                Some(err) => Err(err),
+                None => Ok(()),
+            }
         }
     }
 }
@@ -114,7 +118,7 @@ async fn create_trigger_future(trigger: Trigger, config: Config) -> Result<(), S
             let mut timer = interval(Duration::from_secs(timed.interval as u64));
             loop {
                 timer.tick().await;
-                updater.do_update(EMPTY.clone()).await.unwrap();
+                updater.do_update(EMPTY.clone()).await;
             }
         }
     }
