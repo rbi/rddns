@@ -5,6 +5,7 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::net::IpAddr;
+use std::sync::{Arc, Mutex};
 
 use self::resolver_derived::resolve_derived;
 use self::resolver_interface::resolve_interface;
@@ -35,19 +36,46 @@ impl Display for ResolveFailed {
     }
 }
 
-pub fn resolve_config(
-    config: &Config,
-    addresses: &HashMap<String, IpAddr>,
-) -> Vec<Result<ResolvedDdnsEntry, ResolveFailed>> {
-    resolve(&config.ddns_entries, &config.ip_addresses, addresses)
+#[derive(Clone, Debug)]
+pub struct Resolver {
+    cache: Arc<Mutex<HashMap<String, IpAddr>>>,
 }
 
-pub fn resolve(
+impl Resolver {
+    pub fn new() -> Self {
+        Resolver {
+            cache: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    pub fn resolve_config(
+        &self,
+        config: &Config,
+        addresses: &HashMap<String, IpAddr>,
+    ) -> Vec<Result<ResolvedDdnsEntry, ResolveFailed>> {
+        let mut cache = self.cache.lock().unwrap();
+        let result = resolve(
+            &config.ddns_entries,
+            &config.ip_addresses,
+            addresses,
+            &cache,
+        );
+
+        for new_address in addresses.into_iter() {
+            cache.insert(new_address.0.clone(), new_address.1.clone());
+        }
+
+        result
+    }
+}
+
+fn resolve(
     entries: &Vec<DdnsEntry>,
     address_defs: &HashMap<String, IpAddress>,
     address_actual: &HashMap<String, IpAddr>,
+    address_cache: &HashMap<String, IpAddr>,
 ) -> Vec<Result<ResolvedDdnsEntry, ResolveFailed>> {
-    let resolved_addresses = resolve_addresses(address_defs, address_actual);
+    let resolved_addresses = resolve_addresses(address_defs, address_actual, address_cache);
 
     entries
         .iter()
@@ -90,6 +118,7 @@ fn resolve_entry(
 fn resolve_addresses<'a>(
     address_defs: &HashMap<String, IpAddress>,
     address_actual: &HashMap<String, IpAddr>,
+    address_cache: &HashMap<String, IpAddr>,
 ) -> HashMap<String, IpAddr> {
     let mut resolved = HashMap::new();
 
@@ -100,9 +129,10 @@ fn resolve_addresses<'a>(
         for (name, def) in address_defs {
             match match def {
                 IpAddress::Static(val) => Some(val.address.clone()),
-                IpAddress::FromParameter(val) => address_actual
-                    .get(val.parameter.as_ref().unwrap_or(&name.to_string()))
-                    .cloned(),
+                IpAddress::FromParameter(val) => {
+                    let key = val.parameter.as_ref().unwrap_or(name);
+                    address_actual.get(key).or(address_cache.get(key)).cloned()
+                }
                 IpAddress::Derived(val) => resolve_derived(val, &resolved),
                 IpAddress::Interface(val) => resolve_interface(val),
             } {
@@ -177,7 +207,12 @@ mod tests {
             }),
         ];
 
-        let actual = resolve(&some_entries(), &address_defs, &address_values);
+        let actual = resolve(
+            &some_entries(),
+            &address_defs,
+            &address_values,
+            &HashMap::new(),
+        );
 
         assert_eq!(actual, expected);
     }
@@ -213,7 +248,12 @@ mod tests {
             }),
         ];
 
-        let actual = resolve(&some_entries(), &address_defs, &address_values);
+        let actual = resolve(
+            &some_entries(),
+            &address_defs,
+            &address_values,
+            &HashMap::new(),
+        );
 
         assert_eq!(actual, expected)
     }
@@ -284,7 +324,12 @@ mod tests {
             original: other_host_entry(),
         })];
 
-        let actual = resolve(&some_entries(), &address_defs, &HashMap::new());
+        let actual = resolve(
+            &some_entries(),
+            &address_defs,
+            &HashMap::new(),
+            &HashMap::new(),
+        );
 
         assert_eq!(actual, expected);
     }
@@ -304,7 +349,12 @@ mod tests {
             "2001:DB8:a2f3::29".parse().unwrap(),
         );
 
-        let actual = resolve(&some_entries(), &address_defs, &address_values);
+        let actual = resolve(
+            &some_entries(),
+            &address_defs,
+            &address_values,
+            &HashMap::new(),
+        );
 
         assert_eq!(actual.len(), 2);
         assert!(actual[0].is_err());
@@ -329,7 +379,12 @@ mod tests {
         let mut address_values = HashMap::new();
         address_values.insert("ip1".to_string(), "203.0.113.39".parse().unwrap());
 
-        let actual = resolve(&some_entries(), &address_defs, &address_values);
+        let actual = resolve(
+            &some_entries(),
+            &address_defs,
+            &address_values,
+            &HashMap::new(),
+        );
 
         assert_eq!(actual.len(), 2);
         assert!(actual[0].is_err());
@@ -338,5 +393,47 @@ mod tests {
         assert!(actual[1].is_err());
         let template1 = &actual[1].as_ref().unwrap_err().template;
         assert_eq!(template1, "http://otherHost?ip={other_ip}");
+    }
+
+    #[test]
+    fn resolve_produces_no_error_when_fill_from_cache_is_possible() {
+        let mut address_defs = HashMap::new();
+        address_defs.insert(
+            "ip1".to_string(),
+            IpAddress::FromParameter(IpAddressFromParameter { parameter: None }),
+        );
+        address_defs.insert(
+            "other_ip".to_string(),
+            IpAddress::FromParameter(IpAddressFromParameter {
+                parameter: Some("different_parameter".to_string()),
+            }),
+        );
+        let mut address_values = HashMap::new();
+        address_values.insert(
+            "different_parameter".to_string(),
+            "2001:db8:a2f3::29".parse().unwrap(),
+        );
+
+        let mut cache = HashMap::new();
+        cache.insert("ip1".to_string(), "203.0.59.15".parse().unwrap());
+        cache.insert(
+            "different_parameter".to_string(),
+            "2001:DB8:eeee::15".parse().unwrap(),
+        ); // there is a new actual value which should take precedence over cached values.
+
+        let expected = vec![
+            Ok(ResolvedDdnsEntry {
+                resolved: "http://someHost/path/203.0.59.15?update=2001:db8:a2f3::29".to_string(),
+                original: some_host_entry(),
+            }),
+            Ok(ResolvedDdnsEntry {
+                resolved: "http://otherHost?ip=2001:db8:a2f3::29".to_string(),
+                original: other_host_entry(),
+            }),
+        ];
+
+        let actual = resolve(&some_entries(), &address_defs, &address_values, &cache);
+
+        assert_eq!(actual, expected);
     }
 }

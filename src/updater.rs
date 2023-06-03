@@ -5,14 +5,17 @@ use std::sync::{Arc, Mutex};
 use futures_util::stream::FuturesUnordered;
 use futures_util::StreamExt;
 
+use crate::resolver::Resolver;
+
 use super::config::{Config, DdnsEntry};
-use super::resolver::{resolve_config, ResolvedDdnsEntry};
+use super::resolver::ResolvedDdnsEntry;
 use super::update_executer::update_dns;
 
 #[derive(Clone, Debug)]
 pub struct Updater {
     config: Config,
     cache: Arc<Mutex<HashMap<DdnsEntry, ResolvedDdnsEntry>>>,
+    resolver: Resolver,
 }
 
 pub struct UpdateResults {
@@ -31,13 +34,16 @@ impl Updater {
         Updater {
             config,
             cache: Arc::new(Mutex::new(HashMap::new())),
+            resolver: Resolver::new(),
         }
     }
 
     pub async fn do_update(&self, addresses: HashMap<String, IpAddr>) -> UpdateResults {
         debug!("updating DDNS entries");
 
-        let work = resolve_config(&self.config, &addresses)
+        let work = self
+            .resolver
+            .resolve_config(&self.config, &addresses)
             .iter()
             .map(|entry| async move {
                 match entry {
