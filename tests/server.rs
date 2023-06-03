@@ -1,16 +1,15 @@
-extern crate hyper;
 extern crate futures;
+extern crate hyper;
 extern crate tokio;
 
 mod rddns_driver;
 
 use hyper::Client;
-use tokio::runtime::Runtime;
 use rddns_driver::RddnsProcess;
+use tokio::runtime::Runtime;
 
 #[test]
 fn prints_to_console_on_request() {
-
     // setup
     let mut rddns = RddnsProcess::new("trigger");
 
@@ -28,6 +27,6 @@ fn prints_to_console_on_request() {
             assert!(rddns.stdout_readln().ends_with("Listening on port 3092\n"));
             assert!(rddns.is_running().unwrap())
         }
-        Err(err) => panic!("{}", err)
+        Err(err) => panic!("{}", err),
     }
 }

@@ -1,7 +1,7 @@
-use base64::{Engine as _, engine::general_purpose};
+use base64::{engine::general_purpose, Engine as _};
 use regex::Regex;
-use std::str::from_utf8;
 use std::convert::TryFrom;
+use std::str::from_utf8;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct BasicAuth {
@@ -16,18 +16,15 @@ impl BasicAuth {
                 username: decoded[..seperator].to_owned(),
                 password: Some(decoded[seperator + 1..].to_owned()),
             },
-            None => {
-                BasicAuth {
-                    username: decoded.to_owned(),
-                    password: None
-                }
-            }
+            None => BasicAuth {
+                username: decoded.to_owned(),
+                password: None,
+            },
         }
     }
 }
 
 impl TryFrom<&str> for BasicAuth {
-
     type Error = String;
 
     fn try_from(value: &str) -> Result<Self, String> {
@@ -39,13 +36,19 @@ impl TryFrom<&str> for BasicAuth {
             Some(caps) => match general_purpose::STANDARD.decode(&caps[1]) {
                 Ok(decoded) => match from_utf8(&decoded) {
                     Ok(decoded) => Ok(BasicAuth::decoded_to_basic_auth(decoded)),
-                    Err(err) => Err(format!("Basic auth header decoding failed: {}", err.to_string()))
-                }
-                Err(err) => Err(format!("Failed to base64 decode basic auth header: {}",  err.to_string()))
+                    Err(err) => Err(format!(
+                        "Basic auth header decoding failed: {}",
+                        err.to_string()
+                    )),
+                },
+                Err(err) => Err(format!(
+                    "Failed to base64 decode basic auth header: {}",
+                    err.to_string()
+                )),
             },
-            None => {
-                Err("The value passed did not match the expected Basic auth header format.".to_owned())
-            }
+            None => Err(
+                "The value passed did not match the expected Basic auth header format.".to_owned(),
+            ),
         }
     }
 }
@@ -70,33 +73,48 @@ mod tests {
 
     #[test]
     fn to_auth_header_value_works() {
-        assert_eq!(to_auth_header_value("a_user", "the_password"), "Basic YV91c2VyOnRoZV9wYXNzd29yZA==");
+        assert_eq!(
+            to_auth_header_value("a_user", "the_password"),
+            "Basic YV91c2VyOnRoZV9wYXNzd29yZA=="
+        );
         assert_eq!(to_auth_header_value("", ""), "Basic Og==");
     }
 
     #[test]
     fn to_auth_header_value_no_password_works() {
-        assert_eq!(to_auth_header_value_no_password("my_user"), "Basic bXlfdXNlcg==");
+        assert_eq!(
+            to_auth_header_value_no_password("my_user"),
+            "Basic bXlfdXNlcg=="
+        );
     }
 
     #[test]
     fn basic_auth_from_user_name_password_string_works() {
-        assert_eq!(Ok(BasicAuth {
-            username: "user 1".to_string(),
-            password: Some("super secret".to_string()),
-        }), BasicAuth::try_from("Basic dXNlciAxOnN1cGVyIHNlY3JldA=="));
-        assert_eq!(Ok(BasicAuth {
-            username: "".to_string(),
-            password: Some("".to_string()),
-        }), BasicAuth::try_from("Basic Og=="));
+        assert_eq!(
+            Ok(BasicAuth {
+                username: "user 1".to_string(),
+                password: Some("super secret".to_string()),
+            }),
+            BasicAuth::try_from("Basic dXNlciAxOnN1cGVyIHNlY3JldA==")
+        );
+        assert_eq!(
+            Ok(BasicAuth {
+                username: "".to_string(),
+                password: Some("".to_string()),
+            }),
+            BasicAuth::try_from("Basic Og==")
+        );
     }
 
     #[test]
     fn basic_auth_from_user_name_only_works() {
-        assert_eq!(Ok(BasicAuth {
-            username: "the user".to_string(),
-            password: None,
-        }), BasicAuth::try_from("Basic dGhlIHVzZXI="));
+        assert_eq!(
+            Ok(BasicAuth {
+                username: "the user".to_string(),
+                password: None,
+            }),
+            BasicAuth::try_from("Basic dGhlIHVzZXI=")
+        );
     }
 
     #[test]

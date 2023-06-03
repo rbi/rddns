@@ -1,8 +1,8 @@
 use std::env;
 use std::io::{BufRead, BufReader, Result};
+use std::path::PathBuf;
 use std::process::{Child, ChildStdout, Command, Stdio};
 use std::{thread, time};
-use std::path::PathBuf;
 
 pub struct RddnsProcess {
     process: Child,
@@ -31,10 +31,7 @@ impl RddnsProcess {
         let stdout_raw = process.stdout.take().unwrap();
         let stdout = BufReader::new(stdout_raw);
 
-        let rddns = RddnsProcess {
-            process,
-            stdout,
-        };
+        let rddns = RddnsProcess { process, stdout };
 
         rddns.wait_for_start();
 
@@ -54,7 +51,7 @@ impl RddnsProcess {
     pub fn is_running(&mut self) -> Result<bool> {
         match self.process.try_wait()? {
             Some(_) => Ok(false),
-            None => Ok(true)
+            None => Ok(true),
         }
     }
 
@@ -82,21 +79,22 @@ fn parent_dir_with_file(dir: PathBuf, file: &str) -> Option<PathBuf> {
     let mut file_path = dir.clone();
     file_path.push(file);
     if file_path.exists() {
-        return Some(dir)
+        return Some(dir);
     }
-    dir.parent().and_then(|parent| parent_dir_with_file(parent.to_path_buf(), file))
+    dir.parent()
+        .and_then(|parent| parent_dir_with_file(parent.to_path_buf(), file))
 }
 
 fn target_dir() -> PathBuf {
     parent_dir_with_file(
         env::current_exe().unwrap().parent().unwrap().to_path_buf(),
-        "rddns")
-        .expect("Did not find target dir.")
+        "rddns",
+    )
+    .expect("Did not find target dir.")
 }
 
 fn base_dir() -> PathBuf {
-    parent_dir_with_file(target_dir(), "Cargo.toml")
-        .expect("Did not find base dir.")
+    parent_dir_with_file(target_dir(), "Cargo.toml").expect("Did not find base dir.")
 }
 
 fn rddns_driver_src_dir() -> PathBuf {

@@ -1,9 +1,9 @@
-use std::path::Path;
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::{Error, ErrorKind, Read};
-use std::fmt::{Display, Formatter};
-use std::collections::HashMap;
 use std::net::IpAddr;
+use std::path::Path;
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
 pub struct Config {
@@ -24,7 +24,7 @@ pub enum Trigger {
     #[serde(rename = "http")]
     HTTP(TriggerHttp),
     #[serde(rename = "timed")]
-    TIMED(TriggerTimed)
+    TIMED(TriggerTimed),
 }
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
@@ -32,7 +32,7 @@ pub struct TriggerHttp {
     pub username: Option<String>,
     pub password: Option<String>,
     #[serde(default = "default_server_port")]
-    pub port: u16
+    pub port: u16,
 }
 
 impl Default for TriggerHttp {
@@ -40,7 +40,7 @@ impl Default for TriggerHttp {
         TriggerHttp {
             username: None,
             password: None,
-            port: default_server_port()
+            port: default_server_port(),
         }
     }
 }
@@ -57,14 +57,14 @@ pub enum DdnsEntry {
     #[serde(rename = "http")]
     HTTP(DdnsEntryHttp),
     #[serde(rename = "file")]
-    FILE(DdnsEntryFile)
+    FILE(DdnsEntryFile),
 }
 
 impl DdnsEntry {
     pub fn template(&self) -> &String {
         match self {
-            DdnsEntry::HTTP(http)  => &http.url,
-            DdnsEntry::FILE(file) => &file.replace
+            DdnsEntry::HTTP(http) => &http.url,
+            DdnsEntry::FILE(file) => &file.replace,
         }
     }
 }
@@ -75,7 +75,7 @@ pub struct DdnsEntryHttp {
     pub username: Option<String>,
     pub password: Option<String>,
     #[serde(default = "get_false")]
-    pub ignore_error: bool
+    pub ignore_error: bool,
 }
 
 impl Display for DdnsEntryHttp {
@@ -139,7 +139,9 @@ pub fn read_config(config_file: &Path) -> Result<Config, Error> {
     ::toml::from_str(&contents).map_err(|e| Error::new(ErrorKind::InvalidData, format!("{}", e)))
 }
 
-fn get_false() -> bool {false}
+fn get_false() -> bool {
+    false
+}
 
 fn default_interval() -> u32 {
     300
@@ -153,11 +155,11 @@ fn default_server_port() -> u16 {
 mod tests {
     extern crate tempdir;
 
-    use std::fs::File;
-    use std::path::PathBuf;
-    use std::io::Write;
     use self::tempdir::TempDir;
     use super::*;
+    use std::fs::File;
+    use std::io::Write;
+    use std::path::PathBuf;
 
     #[test]
     fn can_read_maximal_config_file() {
@@ -211,29 +213,42 @@ mod tests {
         let (_temp_dir, config_file_path) = create_temp_file(config_file_content);
 
         let mut ip_addresses = HashMap::new();
-        ip_addresses.insert("addr1".to_string(), IpAddress::FromParameter(IpAddressFromParameter {
-            parameter: Some("addr1".to_string())
-        }));
-        ip_addresses.insert("some_static_addr".to_string(), IpAddress::Static(IpAddressStatic {
-            address: "2001:DB8:123:abcd::1".parse().unwrap(),
-        }));
-        ip_addresses.insert("interfaceAddress".to_string(), IpAddress::Interface(IpAddressInterface {
-            interface: "eth0".parse().unwrap(),
-            network: "::/0".parse().unwrap(),
-        }));
-        ip_addresses.insert("calculated_address".to_string(), IpAddress::Derived(IpAddressDerived {
-            subnet_bits: 64,
-            subnet_entry: "addr1".to_string(),
-            host_entry: "some_static_addr".to_string(),
-        }));
+        ip_addresses.insert(
+            "addr1".to_string(),
+            IpAddress::FromParameter(IpAddressFromParameter {
+                parameter: Some("addr1".to_string()),
+            }),
+        );
+        ip_addresses.insert(
+            "some_static_addr".to_string(),
+            IpAddress::Static(IpAddressStatic {
+                address: "2001:DB8:123:abcd::1".parse().unwrap(),
+            }),
+        );
+        ip_addresses.insert(
+            "interfaceAddress".to_string(),
+            IpAddress::Interface(IpAddressInterface {
+                interface: "eth0".parse().unwrap(),
+                network: "::/0".parse().unwrap(),
+            }),
+        );
+        ip_addresses.insert(
+            "calculated_address".to_string(),
+            IpAddress::Derived(IpAddressDerived {
+                subnet_bits: 64,
+                subnet_entry: "addr1".to_string(),
+                host_entry: "some_static_addr".to_string(),
+            }),
+        );
         let expected = Config {
-            triggers: vec![Trigger::HTTP(TriggerHttp {
-                username: Some("a_user".to_string()),
-                password: Some("a_password".to_string()),
-                port: 3001,
-            }), Trigger::TIMED(TriggerTimed {
-                interval: 5153
-            })],
+            triggers: vec![
+                Trigger::HTTP(TriggerHttp {
+                    username: Some("a_user".to_string()),
+                    password: Some("a_password".to_string()),
+                    port: 3001,
+                }),
+                Trigger::TIMED(TriggerTimed { interval: 5153 }),
+            ],
             ip_addresses,
             ddns_entries: vec![
                 DdnsEntry::HTTP(DdnsEntryHttp {
@@ -250,8 +265,8 @@ mod tests {
                 }),
                 DdnsEntry::FILE(DdnsEntryFile {
                     file: "/etc/somewhere.conf".to_string(),
-                    replace: "myAddr={some_static_addr}".to_string()
-                })
+                    replace: "myAddr={some_static_addr}".to_string(),
+                }),
             ],
         };
         let actual = read_config(&config_file_path)

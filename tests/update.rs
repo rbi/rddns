@@ -1,6 +1,6 @@
-extern crate tokio;
-extern crate hyper;
 extern crate futures;
+extern crate hyper;
+extern crate tokio;
 
 mod rddns_driver;
 
