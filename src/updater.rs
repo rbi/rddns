@@ -59,7 +59,7 @@ impl Updater {
     }
 
     async fn handle_resolved(&self, resolved: ResolvedDdnsEntry) -> Option<UpdateResult> {
-        if self.is_unchanged(&resolved) {
+        if !self.has_changed(&resolved) {
             return None;
         }
         let executed = execute_resolved_dns_entry(&resolved).await;
@@ -69,21 +69,21 @@ impl Updater {
         Some(executed)
     }
 
-    fn is_unchanged(&self, resolved: &ResolvedDdnsEntry) -> bool {
+    fn has_changed(&self, resolved: &ResolvedDdnsEntry) -> bool {
         let cache = self.cache.lock().unwrap();
-        let filter = cache
+        let changed = cache
             .get(&resolved.original)
             .map(|last| last != resolved)
             .unwrap_or(true);
 
-        if !filter {
+        if !changed {
             debug!(
                 "Skip updating DDNS entry because it did not change {}",
                 resolved
             );
         }
 
-        filter
+        changed
     }
 
     fn cache(&self, executed: ResolvedDdnsEntry) {
