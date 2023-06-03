@@ -1,6 +1,9 @@
+use hyper::client::HttpConnector;
 use hyper::header::AUTHORIZATION;
 use hyper::{Body, Client, Request, Uri};
-use hyper_rustls::HttpsConnectorBuilder;
+use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
+use rustls::{ClientConfig, OwnedTrustAnchor, RootCertStore};
+use webpki_roots::TLS_SERVER_ROOTS;
 
 use super::basic_auth_header::{to_auth_header_value, to_auth_header_value_no_password};
 use super::config::{DdnsEntry, DdnsEntryHttp};
@@ -16,11 +19,7 @@ pub async fn update_dns(ddns_entry: &ResolvedDdnsEntry) -> Result<(), String> {
 
 async fn update_via_http(ddns_entry: &DdnsEntryHttp, resolved_url: &String) -> Result<(), String> {
     let uri: Uri = resolved_url.parse().unwrap();
-    let https_connector = HttpsConnectorBuilder::new()
-        .with_native_roots()
-        .https_or_http()
-        .enable_http1()
-        .build();
+    let https_connector = create_https_conector();
     let client = Client::builder().build(https_connector);
 
     let mut request = Request::builder();
@@ -51,6 +50,27 @@ async fn update_via_http(ddns_entry: &DdnsEntryHttp, resolved_url: &String) -> R
             result_code
         ))
     }
+}
+
+fn create_https_conector() -> HttpsConnector<HttpConnector> {
+    let mut root_store = RootCertStore::empty();
+    root_store.add_server_trust_anchors(TLS_SERVER_ROOTS.0.iter().map(|ta| {
+        OwnedTrustAnchor::from_subject_spki_name_constraints(
+            ta.subject,
+            ta.spki,
+            ta.name_constraints,
+        )
+    }));
+    let config = ClientConfig::builder()
+        .with_safe_defaults()
+        .with_root_certificates(root_store)
+        .with_no_client_auth();
+
+    HttpsConnectorBuilder::new()
+        .with_tls_config(config)
+        .https_or_http()
+        .enable_http1()
+        .build()
 }
 
 async fn update_file(file: String, resolved_content: String) -> Result<(), String> {

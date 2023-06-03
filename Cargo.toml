@@ -7,6 +7,8 @@ edition = "2021"
 [dependencies]
 hyper = {version = "0.14.26", features = ["server", "client"] }
 hyper-rustls = "0.24.0"
+rustls = "0.21.1"
+webpki-roots = "0.23.1"
 futures = "0.3.28"
 futures-util = "0.3.28"
 tokio = { version = "1.28.2", features = ["fs", "rt-multi-thread", "time"] }
