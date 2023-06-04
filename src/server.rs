@@ -55,46 +55,42 @@ async fn call<Fut>(
 where
     Fut: Future<Output = UpdateResults>,
 {
-    let authorized = check_authorisation(req.headers(), &server_config);
-    info!(
-        "Received request authorized: {}, uri: {}",
-        authorized.is_ok(),
-        req.uri()
-    );
-    match authorized {
-        Ok(_) => {
-            let ip_parameters = extract_address_parameters(&req.uri().query());
-            let update_result = (update_callback)(ip_parameters).await;
-
-            let return_code = match update_result.errors {
-                Some(_) => StatusCode::INTERNAL_SERVER_ERROR,
-                None => StatusCode::OK,
-            };
-
-            let mut message_parts = Vec::with_capacity(2);
-            if let Some(err) = update_result.errors {
-                message_parts.push(err);
-            }
-            if let Some(warn) = update_result.warnings {
-                message_parts.push(warn);
-            }
-            let message = match message_parts.len() {
-                0 => "success".to_string(),
-                _ => message_parts.join("\n"),
-            };
-
-            Response::builder()
-                .status(return_code)
-                .body(Body::from(message))
-        }
-        Err(_) => Response::builder()
+    info!("Received request: {}", req.uri());
+    let authorized = is_authorized(req.headers(), &server_config);
+    if !authorized {
+        warn!("Request is not authorized.");
+        return Response::builder()
             .status(StatusCode::UNAUTHORIZED)
             .header(WWW_AUTHENTICATE, "Basic realm=\"rddns\"")
-            .body(Body::empty()),
+            .body(Body::empty());
     }
+
+    let ip_parameters = extract_address_parameters(&req.uri().query());
+    let update_result = (update_callback)(ip_parameters).await;
+
+    let return_code = match update_result.errors {
+        Some(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        None => StatusCode::OK,
+    };
+
+    let mut message_parts = Vec::with_capacity(2);
+    if let Some(err) = update_result.errors {
+        message_parts.push(err);
+    }
+    if let Some(warn) = update_result.warnings {
+        message_parts.push(warn);
+    }
+    let message = match message_parts.len() {
+        0 => "success".to_string(),
+        _ => message_parts.join("\n"),
+    };
+
+    Response::builder()
+        .status(return_code)
+        .body(Body::from(message))
 }
 
-fn check_authorisation(headers: &HeaderMap, config: &TriggerHttp) -> Result<(), ()> {
+fn is_authorized(headers: &HeaderMap, config: &TriggerHttp) -> bool {
     match config.username {
         Some(ref username) => headers
             .get(AUTHORIZATION)
@@ -106,8 +102,8 @@ fn check_authorisation(headers: &HeaderMap, config: &TriggerHttp) -> Result<(), 
                     ()
                 })
             })
-            .and_then(|auth| {
-                if auth.username.eq(username)
+            .map(|auth| {
+                auth.username.eq(username)
                     && match config.password {
                         Some(ref config_password) => match auth.password {
                             Some(ref auth_password) => config_password.eq(auth_password),
@@ -115,13 +111,9 @@ fn check_authorisation(headers: &HeaderMap, config: &TriggerHttp) -> Result<(), 
                         },
                         None => true,
                     }
-                {
-                    Ok(())
-                } else {
-                    Err(())
-                }
-            }),
-        None => Ok(()),
+            })
+            .unwrap_or(false),
+        None => true,
     }
 }
 
@@ -235,10 +227,10 @@ mod tests {
             AUTHORIZATION,
             "Basic c29tZV91c2VyOnNvbWVfcGFzc3dvcmQ=".parse().unwrap(),
         );
-        assert!(check_authorisation(&headers_with_auth, &conf).is_ok());
+        assert!(is_authorized(&headers_with_auth, &conf));
 
         let headers_without_auth = HeaderMap::new();
-        assert!(check_authorisation(&headers_without_auth, &conf).is_ok());
+        assert!(is_authorized(&headers_without_auth, &conf));
     }
 
     #[test]
@@ -255,7 +247,7 @@ mod tests {
             AUTHORIZATION,
             "Basic c29tZV91c2VyOnNvbWVfcGFzc3dvcmQ=".parse().unwrap(),
         );
-        assert!(check_authorisation(&headers, &conf).is_ok());
+        assert!(is_authorized(&headers, &conf));
     }
 
     #[test]
@@ -267,7 +259,7 @@ mod tests {
         };
 
         let headers_without_auth = HeaderMap::new();
-        assert!(check_authorisation(&headers_without_auth, &conf).is_err());
+        assert!(!is_authorized(&headers_without_auth, &conf));
 
         let mut headers_with_wrong_pw = HeaderMap::new();
         // some_user:other_password
@@ -275,7 +267,7 @@ mod tests {
             AUTHORIZATION,
             "Basic c29tZV91c2VyOm90aGVyX3Bhc3N3b3Jk".parse().unwrap(),
         );
-        assert!(check_authorisation(&headers_with_wrong_pw, &conf).is_err());
+        assert!(!is_authorized(&headers_with_wrong_pw, &conf));
 
         let mut headers_with_wrong_user = HeaderMap::new();
         // other_user:some_password
@@ -283,7 +275,7 @@ mod tests {
             AUTHORIZATION,
             "Basic b3RoZXJfdXNlcjpzb21lX3Bhc3N3b3Jk".parse().unwrap(),
         );
-        assert!(check_authorisation(&headers_with_wrong_user, &conf).is_err());
+        assert!(!is_authorized(&headers_with_wrong_user, &conf));
     }
 
     #[test]
@@ -297,11 +289,11 @@ mod tests {
         let mut headers_with_right_user = HeaderMap::new();
         // some_user
         headers_with_right_user.append(AUTHORIZATION, "Basic c29tZV91c2Vy".parse().unwrap());
-        assert!(check_authorisation(&headers_with_right_user, &conf).is_ok());
+        assert!(is_authorized(&headers_with_right_user, &conf));
 
         let mut headers_with_wrong_user = HeaderMap::new();
         // other_user
         headers_with_wrong_user.append(AUTHORIZATION, "Basic b3RoZXJfdXNlcg==".parse().unwrap());
-        assert!(check_authorisation(&headers_with_wrong_user, &conf).is_err());
+        assert!(!is_authorized(&headers_with_wrong_user, &conf));
     }
 }
