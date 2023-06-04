@@ -10,17 +10,54 @@ use super::config::{DdnsEntry, DdnsEntryHttp};
 use super::resolver::ResolvedDdnsEntry;
 use tokio::fs::write;
 
-pub async fn update_dns(ddns_entry: &ResolvedDdnsEntry) -> Result<(), String> {
-    match &ddns_entry.original {
-        DdnsEntry::HTTP(http) => update_via_http(&http, &ddns_entry.resolved).await,
-        DdnsEntry::FILE(file) => update_file(file.file.clone(), ddns_entry.resolved.clone()).await,
+#[derive(Clone, Debug)]
+pub struct UpdateExecutor {
+    client: Client<HttpsConnector<HttpConnector>>,
+}
+
+impl UpdateExecutor {
+    pub fn new() -> Self {
+        let mut root_store = RootCertStore::empty();
+        root_store.add_server_trust_anchors(TLS_SERVER_ROOTS.0.iter().map(|ta| {
+            OwnedTrustAnchor::from_subject_spki_name_constraints(
+                ta.subject,
+                ta.spki,
+                ta.name_constraints,
+            )
+        }));
+        let config = ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(root_store)
+            .with_no_client_auth();
+
+        let https_connector = HttpsConnectorBuilder::new()
+            .with_tls_config(config)
+            .https_or_http()
+            .enable_http1()
+            .build();
+        let client = Client::builder().build(https_connector);
+
+        UpdateExecutor { client }
+    }
+
+    pub async fn update_dns(&self, ddns_entry: &ResolvedDdnsEntry) -> Result<(), String> {
+        match &ddns_entry.original {
+            DdnsEntry::HTTP(http) => {
+                update_via_http(self.client.clone(), &http, &ddns_entry.resolved).await
+            }
+            DdnsEntry::FILE(file) => {
+                update_file(file.file.clone(), ddns_entry.resolved.clone()).await
+            }
+        }
     }
 }
 
-async fn update_via_http(ddns_entry: &DdnsEntryHttp, resolved_url: &String) -> Result<(), String> {
+async fn update_via_http(
+    client: Client<HttpsConnector<HttpConnector>>,
+    ddns_entry: &DdnsEntryHttp,
+    resolved_url: &String,
+) -> Result<(), String> {
     let uri: Uri = resolved_url.parse().unwrap();
-    let https_connector = create_https_conector();
-    let client = Client::builder().build(https_connector);
 
     let mut request = Request::builder();
     request = request.uri(uri);
@@ -50,27 +87,6 @@ async fn update_via_http(ddns_entry: &DdnsEntryHttp, resolved_url: &String) -> R
             result_code
         ))
     }
-}
-
-fn create_https_conector() -> HttpsConnector<HttpConnector> {
-    let mut root_store = RootCertStore::empty();
-    root_store.add_server_trust_anchors(TLS_SERVER_ROOTS.0.iter().map(|ta| {
-        OwnedTrustAnchor::from_subject_spki_name_constraints(
-            ta.subject,
-            ta.spki,
-            ta.name_constraints,
-        )
-    }));
-    let config = ClientConfig::builder()
-        .with_safe_defaults()
-        .with_root_certificates(root_store)
-        .with_no_client_auth();
-
-    HttpsConnectorBuilder::new()
-        .with_tls_config(config)
-        .https_or_http()
-        .enable_http1()
-        .build()
 }
 
 async fn update_file(file: String, resolved_content: String) -> Result<(), String> {

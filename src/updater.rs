@@ -9,13 +9,14 @@ use crate::resolver::Resolver;
 
 use super::config::{Config, DdnsEntry};
 use super::resolver::ResolvedDdnsEntry;
-use super::update_executer::update_dns;
+use super::update_executer::UpdateExecutor;
 
 #[derive(Clone, Debug)]
 pub struct Updater {
     config: Config,
     cache: Arc<Mutex<HashMap<DdnsEntry, ResolvedDdnsEntry>>>,
     resolver: Resolver,
+    update_executor: UpdateExecutor,
 }
 
 pub struct UpdateResults {
@@ -35,6 +36,7 @@ impl Updater {
             config,
             cache: Arc::new(Mutex::new(HashMap::new())),
             resolver: Resolver::new(),
+            update_executor: UpdateExecutor::new(),
         }
     }
 
@@ -62,7 +64,7 @@ impl Updater {
         if !self.has_changed(&resolved) {
             return None;
         }
-        let executed = execute_resolved_dns_entry(&resolved).await;
+        let executed = execute_resolved_dns_entry(&self.update_executor, &resolved).await;
         if let UpdateResult::Ok = executed {
             self.cache(resolved);
         }
@@ -112,8 +114,11 @@ fn error_to_update_result(entry: &DdnsEntry, error_message: String) -> UpdateRes
     }
 }
 
-async fn execute_resolved_dns_entry(resolved: &ResolvedDdnsEntry) -> UpdateResult {
-    let result = update_dns(&resolved).await;
+async fn execute_resolved_dns_entry(
+    update_executor: &UpdateExecutor,
+    resolved: &ResolvedDdnsEntry,
+) -> UpdateResult {
+    let result = update_executor.update_dns(&resolved).await;
     if let Err(error_msg) = result {
         error_to_update_result(&resolved.original, error_msg)
     } else {
