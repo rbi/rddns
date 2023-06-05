@@ -16,8 +16,7 @@
 #
 # In server mode these parameters must be passed as HTTP query parameter to the rddns HTTP server. They must be passed
 # in the form "ip[<parameter>]=<address>" where <parameter> is the name of the parameter that is configured with the
-# "parameter" option and <address> is the current address. A second form that is possible is
-# "ip.base64[<parameter>]=<address>". When this form is used the <address> value is expected to be base64 encoded.
+# "parameter" option and <address> is the current address.
 #
 # In update mode these parameters musst be passed as command line arguments. They must have the form of
 # "--ip <parameter>=<address>" whith <parameter> and <address> having the same semantics as in server mode.
@@ -33,6 +32,12 @@ type = "parameter"
 # The for name of the parameter. This is optional. If it is missing the name of the parameter is the same as the
 # identifier.
 parameter = "my_parameter"
+# Allows do transfer Base64 encoded values for parameters. This is false by default if unset.
+base64_encoded = false
+# Specifies the format of the parameter value. This is "IpAddress" by default meaning that the value is an IPv4 or
+# IPv6 address. The other possibility for this configuration is "IpNetwork". In that case the values is expected to be
+# an IPv4 or IPv6 network in CIDR notation.
+format = "IpAddress"
 
 # IP address sources of type "static" use a fixed IP address that is configured with the option "address".
 [ip.otherAddress]

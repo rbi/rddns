@@ -1,5 +1,6 @@
 mod resolver_derived;
 mod resolver_interface;
+mod resolver_parameter;
 
 use regex::Regex;
 use std::collections::HashMap;
@@ -9,6 +10,7 @@ use std::sync::{Arc, Mutex};
 
 use self::resolver_derived::resolve_derived;
 use self::resolver_interface::resolve_interface;
+use self::resolver_parameter::resolve_parameter;
 use super::config::{Config, DdnsEntry, IpAddress};
 
 #[derive(Clone, PartialEq, Debug)]
@@ -38,7 +40,7 @@ impl Display for ResolveFailed {
 
 #[derive(Clone, Debug)]
 pub struct Resolver {
-    cache: Arc<Mutex<HashMap<String, IpAddr>>>,
+    cache: Arc<Mutex<HashMap<String, String>>>,
 }
 
 impl Resolver {
@@ -51,7 +53,7 @@ impl Resolver {
     pub fn resolve_config(
         &self,
         config: &Config,
-        addresses: &HashMap<String, IpAddr>,
+        addresses: &HashMap<String, String>,
     ) -> Vec<Result<ResolvedDdnsEntry, ResolveFailed>> {
         let mut cache = self.cache.lock().unwrap();
         let result = resolve(
@@ -72,8 +74,8 @@ impl Resolver {
 fn resolve(
     entries: &Vec<DdnsEntry>,
     address_defs: &HashMap<String, IpAddress>,
-    address_actual: &HashMap<String, IpAddr>,
-    address_cache: &HashMap<String, IpAddr>,
+    address_actual: &HashMap<String, String>,
+    address_cache: &HashMap<String, String>,
 ) -> Vec<Result<ResolvedDdnsEntry, ResolveFailed>> {
     let resolved_addresses = resolve_addresses(address_defs, address_actual, address_cache);
 
@@ -117,8 +119,8 @@ fn resolve_entry(
 
 fn resolve_addresses<'a>(
     address_defs: &HashMap<String, IpAddress>,
-    address_actual: &HashMap<String, IpAddr>,
-    address_cache: &HashMap<String, IpAddr>,
+    address_actual: &HashMap<String, String>,
+    address_cache: &HashMap<String, String>,
 ) -> HashMap<String, IpAddr> {
     let mut resolved = HashMap::new();
 
@@ -131,7 +133,10 @@ fn resolve_addresses<'a>(
                 IpAddress::Static(val) => Some(val.address.clone()),
                 IpAddress::FromParameter(val) => {
                     let key = val.parameter.as_ref().unwrap_or(name);
-                    address_actual.get(key).or(address_cache.get(key)).cloned()
+                    address_actual
+                        .get(key)
+                        .or(address_cache.get(key))
+                        .and_then(|value| resolve_parameter(val, value))
                 }
                 IpAddress::Derived(val) => resolve_derived(val, &resolved),
                 IpAddress::Interface(val) => resolve_interface(val),
@@ -222,13 +227,13 @@ mod tests {
         let mut address_defs = HashMap::new();
         address_defs.insert(
             "ip1".to_string(),
-            IpAddress::FromParameter(IpAddressFromParameter { parameter: None }),
+            IpAddress::FromParameter(IpAddressFromParameter::new_no_parameter_name()),
         );
         address_defs.insert(
             "other_ip".to_string(),
-            IpAddress::FromParameter(IpAddressFromParameter {
-                parameter: Some("different_parameter".to_string()),
-            }),
+            IpAddress::FromParameter(IpAddressFromParameter::new(
+                "different_parameter".to_string(),
+            )),
         );
         let mut address_values = HashMap::new();
         address_values.insert("ip1".to_string(), "203.0.113.39".parse().unwrap());
@@ -339,9 +344,9 @@ mod tests {
         let mut address_defs = HashMap::new();
         address_defs.insert(
             "other_ip".to_string(),
-            IpAddress::FromParameter(IpAddressFromParameter {
-                parameter: Some("different_parameter".to_string()),
-            }),
+            IpAddress::FromParameter(IpAddressFromParameter::new(
+                "different_parameter".to_string(),
+            )),
         );
         let mut address_values = HashMap::new();
         address_values.insert(
@@ -368,13 +373,13 @@ mod tests {
         let mut address_defs = HashMap::new();
         address_defs.insert(
             "ip1".to_string(),
-            IpAddress::FromParameter(IpAddressFromParameter { parameter: None }),
+            IpAddress::FromParameter(IpAddressFromParameter::new_no_parameter_name()),
         );
         address_defs.insert(
             "other_ip".to_string(),
-            IpAddress::FromParameter(IpAddressFromParameter {
-                parameter: Some("different_parameter".to_string()),
-            }),
+            IpAddress::FromParameter(IpAddressFromParameter::new(
+                "different_parameter".to_string(),
+            )),
         );
         let mut address_values = HashMap::new();
         address_values.insert("ip1".to_string(), "203.0.113.39".parse().unwrap());
@@ -400,13 +405,13 @@ mod tests {
         let mut address_defs = HashMap::new();
         address_defs.insert(
             "ip1".to_string(),
-            IpAddress::FromParameter(IpAddressFromParameter { parameter: None }),
+            IpAddress::FromParameter(IpAddressFromParameter::new_no_parameter_name()),
         );
         address_defs.insert(
             "other_ip".to_string(),
-            IpAddress::FromParameter(IpAddressFromParameter {
-                parameter: Some("different_parameter".to_string()),
-            }),
+            IpAddress::FromParameter(IpAddressFromParameter::new(
+                "different_parameter".to_string(),
+            )),
         );
         let mut address_values = HashMap::new();
         address_values.insert(

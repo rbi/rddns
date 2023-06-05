@@ -118,6 +118,34 @@ pub enum IpAddress {
 #[derive(Clone, PartialEq, Debug, Deserialize)]
 pub struct IpAddressFromParameter {
     pub parameter: Option<String>,
+    #[serde(default = "get_false")]
+    pub base64_encoded: bool,
+    #[serde(default = "default_from_parameter_format")]
+    pub format: FromParameterFormat,
+}
+
+#[cfg(test)]
+impl IpAddressFromParameter {
+    pub fn new(parameter: String) -> Self {
+        IpAddressFromParameter {
+            parameter: Some(parameter),
+            base64_encoded: false,
+            format: FromParameterFormat::IpAddress,
+        }
+    }
+    pub fn new_no_parameter_name() -> Self {
+        IpAddressFromParameter {
+            parameter: None,
+            base64_encoded: false,
+            format: FromParameterFormat::IpAddress,
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Debug, Deserialize)]
+pub enum FromParameterFormat {
+    IpAddress,
+    IpNetwork,
 }
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
@@ -157,6 +185,10 @@ fn default_server_port() -> u16 {
     3092
 }
 
+fn default_from_parameter_format() -> FromParameterFormat {
+    FromParameterFormat::IpAddress
+}
+
 #[cfg(test)]
 mod tests {
     extern crate tempdir;
@@ -183,6 +215,12 @@ mod tests {
         [ip.addr1]
         type = "parameter"
         parameter = "addr1"
+
+        [ip.parameter_max]
+        type = "parameter"
+        parameter = "p_max"
+        base64_encoded = true
+        format = "IpNetwork"
 
         [ip.some_static_addr]
         type = "static"
@@ -223,6 +261,16 @@ mod tests {
             "addr1".to_string(),
             IpAddress::FromParameter(IpAddressFromParameter {
                 parameter: Some("addr1".to_string()),
+                base64_encoded: false,
+                format: FromParameterFormat::IpAddress,
+            }),
+        );
+        ip_addresses.insert(
+            "parameter_max".to_string(),
+            IpAddress::FromParameter(IpAddressFromParameter {
+                parameter: Some("p_max".to_string()),
+                base64_encoded: true,
+                format: FromParameterFormat::IpNetwork,
             }),
         );
         ip_addresses.insert(

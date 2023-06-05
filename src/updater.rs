@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::net::IpAddr;
 use std::sync::{Arc, Mutex};
 
 use futures_util::stream::FuturesUnordered;
@@ -40,7 +39,7 @@ impl Updater {
         }
     }
 
-    pub async fn do_update(&self, addresses: HashMap<String, IpAddr>) -> UpdateResults {
+    pub async fn do_update(&self, addresses: HashMap<String, String>) -> UpdateResults {
         debug!("updating DDNS entries");
 
         let work = self

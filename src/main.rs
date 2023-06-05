@@ -31,7 +31,6 @@ mod updater;
 use futures_util::stream::FuturesUnordered;
 use futures_util::StreamExt;
 use std::collections::HashMap;
-use std::net::IpAddr;
 use std::time::Duration;
 use tokio::runtime::Runtime;
 use tokio::time::interval;
@@ -100,7 +99,7 @@ fn init_logging() {
 
 async fn create_trigger_future(trigger: Trigger, config: Config) -> Result<(), String> {
     lazy_static! {
-        static ref EMPTY: HashMap<String, IpAddr> = HashMap::new();
+        static ref EMPTY: HashMap<String, String> = HashMap::new();
     }
     let updater = Updater::new(config.clone());
     match trigger {

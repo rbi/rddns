@@ -1,11 +1,10 @@
 use clap::{Arg, ArgAction, Command};
 use regex::Regex;
 use std::collections::HashMap;
-use std::net::IpAddr;
 use std::path::PathBuf;
 
 pub struct CommandLine {
-    pub addresses: HashMap<String, IpAddr>,
+    pub addresses: HashMap<String, String>,
     pub execution_mode: ExecutionMode,
     pub config_file: PathBuf,
 }
@@ -40,7 +39,7 @@ They must have the form [name]=[address], e.g. my_parameter=203.0.113.25 .")
     CommandLine {
         addresses: match matches.subcommand_matches("update") {
             Some(update_matches) => update_matches
-                .get_many::<(String, IpAddr)>("ip")
+                .get_many::<(String, String)>("ip")
                 .map(|val| val.map(|val| val.clone()).collect())
                 .unwrap_or_else(HashMap::new),
             _ => HashMap::new(),
@@ -54,7 +53,7 @@ They must have the form [name]=[address], e.g. my_parameter=203.0.113.25 .")
     }
 }
 
-fn parse_ip_parameter(value: &str) -> Result<(String, IpAddr), String> {
+fn parse_ip_parameter(value: &str) -> Result<(String, String), String> {
     lazy_static! {
         static ref IP_PARAM: Regex = Regex::new(r"([^=]+)=(.+)").unwrap();
     }
@@ -62,13 +61,7 @@ fn parse_ip_parameter(value: &str) -> Result<(String, IpAddr), String> {
         .captures(&value)
         .map(|groups| (groups[1].to_string(), groups[2].to_string()))
     {
-        Some((name, parameter)) => match parameter.parse() {
-            Ok(ip) => Ok((name, ip)),
-            Err(_) => Err(format!(
-                "Expected a valid IP address but got {}.",
-                parameter
-            )),
-        },
+        Some((name, parameter)) => Ok((name, parameter)),
         None => Err(format!(
             "IP parameter must have the format [name]=[address] but got \"{}\".",
             value
