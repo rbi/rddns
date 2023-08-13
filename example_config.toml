@@ -84,8 +84,8 @@ host_entry = "some_address"
 
 # If type=http  a HTTP request is executed to trigger the update. The URL that should be called  is configured with the
 # "url" option. The URL can contain placeholder in the form of "{<identifier>}" where <identifier> must be the identifier
-# of one of the IP addresses sources configured in an "[ip.*]" section. These placeholders will be replaced with the current
-# IP addresse of the source on update.
+# of one of the IP addresses sources configured in an "[ip.*]" section. These placeholders will be replaced with the
+# current IP addresse of the source on update.
 
 # The following entry is an example how to update an entry at the Hurrican Electric dynamic DNS service.
 [[ddns_entry]]
@@ -102,12 +102,18 @@ password = "secret"
 # Default if missing: "false"
 ignore_error = true
 
-# The following example demonstrates an update at a service that does not require credentials. The URL that is called
+# The following example demonstrates how to define custom HTTP headers, body and method. The URL that is called
 # would be resolved to "http://example.com/dynupdate/2001:DB8:123:abcd::1?doUpdate=true" as "otherAddress" is configured
 # above to be a static IP address.
 [[ddns_entry]]
 type = "http"
 url = "http://example.com/dynupdate/{otherAddress}?doUpdate=true"
+method = "POST"
+headers = { Content-Typ = "application/xml", X-My-Header = "ip={some_address}" }
+body = """<Update>
+  <ip name="someIp">{otherAddress}</ip>
+</Update>
+"""
 
 # The following example shows how to write IP addresses to a file. The file option specifies which file should be written.
 # The template defines the content that should be written to that file. Placeholders in the form of "{<identifier>}" are

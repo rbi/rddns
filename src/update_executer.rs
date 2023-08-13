@@ -6,7 +6,7 @@ use rustls::{ClientConfig, OwnedTrustAnchor, RootCertStore};
 use webpki_roots::TLS_SERVER_ROOTS;
 
 use super::basic_auth_header::{to_auth_header_value, to_auth_header_value_no_password};
-use super::config::{DdnsEntry, DdnsEntryHttp};
+use super::config::{DdnsEntry, DdnsEntryFile, DdnsEntryHttp};
 use super::resolver::ResolvedDdnsEntry;
 use tokio::fs::write;
 
@@ -41,13 +41,9 @@ impl UpdateExecutor {
     }
 
     pub async fn update_dns(&self, ddns_entry: &ResolvedDdnsEntry) -> Result<(), String> {
-        match &ddns_entry.original {
-            DdnsEntry::HTTP(http) => {
-                update_via_http(self.client.clone(), &http, &ddns_entry.resolved).await
-            }
-            DdnsEntry::FILE(file) => {
-                update_file(file.file.clone(), ddns_entry.resolved.clone()).await
-            }
+        match &ddns_entry.resolved {
+            DdnsEntry::HTTP(http) => update_via_http(self.client.clone(), http).await,
+            DdnsEntry::FILE(file) => update_file(file).await,
         }
     }
 }
@@ -55,27 +51,35 @@ impl UpdateExecutor {
 async fn update_via_http(
     client: Client<HttpsConnector<HttpConnector>>,
     ddns_entry: &DdnsEntryHttp,
-    resolved_url: &String,
 ) -> Result<(), String> {
-    let uri: Uri = resolved_url.parse().unwrap();
+    let uri: Uri = ddns_entry.url.parse().unwrap();
 
     let mut request = Request::builder();
     request = request.uri(uri);
 
-    let header_value = ddns_entry.username.as_ref().map(|username| {
+    let auth_header_value = ddns_entry.username.as_ref().map(|username| {
         ddns_entry.password.as_ref().map_or(
             to_auth_header_value_no_password(username),
             |ref password| to_auth_header_value(username, password),
         )
     });
 
-    request = match header_value {
+    request = match auth_header_value {
         Some(value) => request.header(AUTHORIZATION, value),
         None => request,
     };
 
+    for (header, value) in &ddns_entry.headers {
+        request = request.header(header, value);
+    }
+
+    let body = match &ddns_entry.body {
+        Some(body) => Body::from(body.clone()),
+        None => Body::empty(),
+    };
+
     let result = client
-        .request(request.body(Body::empty()).unwrap())
+        .request(request.body(body).unwrap())
         .await
         .map_err(|err| err.to_string())?;
     let result_code = result.status().as_u16();
@@ -89,8 +93,8 @@ async fn update_via_http(
     }
 }
 
-async fn update_file(file: String, resolved_content: String) -> Result<(), String> {
-    write(file, resolved_content)
+async fn update_file(file: &DdnsEntryFile) -> Result<(), String> {
+    write(file.file.clone(), file.replace.clone())
         .await
         .map_err(|err| err.to_string())
 }

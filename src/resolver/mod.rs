@@ -15,7 +15,7 @@ use super::config::{Config, DdnsEntry, IpAddress};
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct ResolvedDdnsEntry {
-    pub resolved: String,
+    pub resolved: DdnsEntry,
     pub original: DdnsEntry,
 }
 
@@ -89,32 +89,37 @@ fn resolve_entry(
     entry: &DdnsEntry,
     resolved_addresses: &HashMap<String, IpAddr>,
 ) -> Result<ResolvedDdnsEntry, ResolveFailed> {
-    let mut resolved = entry.template().clone();
-    for (addr_key, addr_value) in resolved_addresses.iter() {
-        let placeholder = format!("{{{}}}", addr_key);
-        if resolved.contains(&placeholder) {
-            resolved = resolved.replace(&placeholder, &addr_value.to_string());
+    let resolvables = entry.resolvables();
+    let mut all_resolved = Vec::with_capacity(resolvables.len());
+    for resolvable in resolvables {
+        let mut resolved = resolvable.clone();
+        for (addr_key, addr_value) in resolved_addresses.iter() {
+            let placeholder = format!("{{{}}}", addr_key);
+            if resolved.contains(&placeholder) {
+                resolved = resolved.replace(&placeholder, &addr_value.to_string());
+            }
+        }
+        lazy_static! {
+            static ref PLACEHOLDER: Regex = Regex::new(r"\{[^\}\s]*\}").unwrap();
+        }
+
+        if PLACEHOLDER.is_match(&resolved) {
+            return Err(ResolveFailed {
+                template: resolvable,
+                message:
+                    "Some placeholders for IP addresses could not be resolved to actual addresses."
+                        .to_string(),
+                original: entry.clone(),
+            });
+        } else {
+            all_resolved.push(resolved);
         }
     }
 
-    lazy_static! {
-        static ref PLACEHOLDER: Regex = Regex::new(r"\{[^\}\s]*\}").unwrap();
-    }
-
-    if PLACEHOLDER.is_match(&resolved) {
-        Err(ResolveFailed {
-            template: entry.template().clone(),
-            message:
-                "Some placeholders for IP addresses could not be resolved to actual addresses."
-                    .to_string(),
-            original: entry.clone(),
-        })
-    } else {
-        Ok(ResolvedDdnsEntry {
-            resolved: resolved,
-            original: entry.clone(),
-        })
-    }
+    Ok(ResolvedDdnsEntry {
+        resolved: entry.resolve(all_resolved),
+        original: entry.clone(),
+    })
 }
 
 fn resolve_addresses<'a>(
@@ -157,11 +162,18 @@ fn resolve_addresses<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{DdnsEntryHttp, IpAddressDerived, IpAddressFromParameter, IpAddressStatic};
+    use crate::config::{
+        DdnsEntryFile, DdnsEntryHttp, HttpMethod, IpAddressDerived, IpAddressFromParameter,
+        IpAddressStatic,
+    };
+    use std::collections::BTreeMap;
 
     fn some_host_entry() -> DdnsEntry {
         DdnsEntry::HTTP(DdnsEntryHttp {
             url: "http://someHost/path/{ip1}?update={other_ip}".to_string(),
+            method: HttpMethod::POST,
+            body: None,
+            headers: BTreeMap::new(),
             username: Some("user".to_string()),
             password: Some("pass".to_string()),
             ignore_error: true,
@@ -171,6 +183,9 @@ mod tests {
     fn other_host_entry() -> DdnsEntry {
         DdnsEntry::HTTP(DdnsEntryHttp {
             url: "http://otherHost?ip={other_ip}".to_string(),
+            method: HttpMethod::GET,
+            body: None,
+            headers: BTreeMap::new(),
             username: None,
             password: None,
             ignore_error: false,
@@ -202,12 +217,28 @@ mod tests {
 
         let expected = vec![
             Ok(ResolvedDdnsEntry {
-                resolved: "http://someHost/path/2001:db8:123:beef::42?update=203.0.113.25"
-                    .to_string(),
+                resolved: DdnsEntry::HTTP(DdnsEntryHttp {
+                    url: "http://someHost/path/2001:db8:123:beef::42?update=203.0.113.25"
+                        .to_string(),
+                    method: HttpMethod::POST,
+                    body: None,
+                    headers: BTreeMap::new(),
+                    username: Some("user".to_string()),
+                    password: Some("pass".to_string()),
+                    ignore_error: true,
+                }),
                 original: some_host_entry(),
             }),
             Ok(ResolvedDdnsEntry {
-                resolved: "http://otherHost?ip=203.0.113.25".to_string(),
+                resolved: DdnsEntry::HTTP(DdnsEntryHttp {
+                    url: "http://otherHost?ip=203.0.113.25".to_string(),
+                    method: HttpMethod::GET,
+                    body: None,
+                    headers: BTreeMap::new(),
+                    username: None,
+                    password: None,
+                    ignore_error: false,
+                }),
                 original: other_host_entry(),
             }),
         ];
@@ -244,11 +275,27 @@ mod tests {
 
         let expected = vec![
             Ok(ResolvedDdnsEntry {
-                resolved: "http://someHost/path/203.0.113.39?update=2001:db8:a2f3::29".to_string(),
+                resolved: DdnsEntry::HTTP(DdnsEntryHttp {
+                    url: "http://someHost/path/203.0.113.39?update=2001:db8:a2f3::29".to_string(),
+                    method: HttpMethod::POST,
+                    body: None,
+                    headers: BTreeMap::new(),
+                    username: Some("user".to_string()),
+                    password: Some("pass".to_string()),
+                    ignore_error: true,
+                }),
                 original: some_host_entry(),
             }),
             Ok(ResolvedDdnsEntry {
-                resolved: "http://otherHost?ip=2001:db8:a2f3::29".to_string(),
+                resolved: DdnsEntry::HTTP(DdnsEntryHttp {
+                    url: "http://otherHost?ip=2001:db8:a2f3::29".to_string(),
+                    method: HttpMethod::GET,
+                    body: None,
+                    headers: BTreeMap::new(),
+                    username: None,
+                    password: None,
+                    ignore_error: false,
+                }),
                 original: other_host_entry(),
             }),
         ];
@@ -321,13 +368,33 @@ mod tests {
             }),
         );
 
-        let expected = vec![Ok(ResolvedDdnsEntry {
-            resolved: "http://someHost/path/203.0.113.42?update=2001:db8:a2f3:9999:4bcf:78ff:feac:8bd9".to_string(),
-            original: some_host_entry(),
-        }), Ok(ResolvedDdnsEntry {
-            resolved: "http://otherHost?ip=2001:db8:a2f3:9999:4bcf:78ff:feac:8bd9".to_string(),
-            original: other_host_entry(),
-        })];
+        let expected = vec![
+            Ok(ResolvedDdnsEntry{
+                resolved: DdnsEntry::HTTP(DdnsEntryHttp {
+                    url: "http://someHost/path/203.0.113.42?update=2001:db8:a2f3:9999:4bcf:78ff:feac:8bd9"
+                        .to_string(),
+                    method: HttpMethod::POST,
+                    body: None,
+                    headers: BTreeMap::new(),
+                    username: Some("user".to_string()),
+                    password: Some("pass".to_string()),
+                    ignore_error: true,
+                }),
+                original: some_host_entry(),
+            }),
+            Ok(ResolvedDdnsEntry{
+                resolved: DdnsEntry::HTTP(DdnsEntryHttp {
+                    url: "http://otherHost?ip=2001:db8:a2f3:9999:4bcf:78ff:feac:8bd9".to_string(),
+                    method: HttpMethod::GET,
+                    body: None,
+                    headers: BTreeMap::new(),
+                    username: None,
+                    password: None,
+                    ignore_error: false,
+                }),
+                original: other_host_entry(),
+            }),
+        ];
 
         let actual = resolve(
             &some_entries(),
@@ -428,11 +495,27 @@ mod tests {
 
         let expected = vec![
             Ok(ResolvedDdnsEntry {
-                resolved: "http://someHost/path/203.0.59.15?update=2001:db8:a2f3::29".to_string(),
+                resolved: DdnsEntry::HTTP(DdnsEntryHttp {
+                    url: "http://someHost/path/203.0.59.15?update=2001:db8:a2f3::29".to_string(),
+                    method: HttpMethod::POST,
+                    body: None,
+                    headers: BTreeMap::new(),
+                    username: Some("user".to_string()),
+                    password: Some("pass".to_string()),
+                    ignore_error: true,
+                }),
                 original: some_host_entry(),
             }),
             Ok(ResolvedDdnsEntry {
-                resolved: "http://otherHost?ip=2001:db8:a2f3::29".to_string(),
+                resolved: DdnsEntry::HTTP(DdnsEntryHttp {
+                    url: "http://otherHost?ip=2001:db8:a2f3::29".to_string(),
+                    method: HttpMethod::GET,
+                    body: None,
+                    headers: BTreeMap::new(),
+                    username: None,
+                    password: None,
+                    ignore_error: false,
+                }),
                 original: other_host_entry(),
             }),
         ];
@@ -440,5 +523,95 @@ mod tests {
         let actual = resolve(&some_entries(), &address_defs, &address_values, &cache);
 
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn resolve_resolves_all_resolvable_ddns_entry_http_fields() {
+        let mut address_defs = HashMap::new();
+        address_defs.insert(
+            "ip1".to_string(),
+            IpAddress::Static(IpAddressStatic {
+                address: "2001:DB8:123:beef::42".parse().unwrap(),
+            }),
+        );
+        address_defs.insert(
+            "other_ip".to_string(),
+            IpAddress::Static(IpAddressStatic {
+                address: "203.0.113.25".parse().unwrap(),
+            }),
+        );
+        let address_values = HashMap::new();
+
+        let input1 = DdnsEntry::HTTP(DdnsEntryHttp {
+            url: "http://example.com/{ip1}".to_string(),
+            username: Some("someUser".to_string()),
+            password: Some("somePassword".to_string()),
+            ignore_error: true,
+            method: HttpMethod::POST,
+            headers: BTreeMap::from([
+                ("Content-Typ".to_string(), "text/plain".to_string()),
+                (
+                    "X-My-Header".to_string(),
+                    "ip={other_ip}".to_string(),
+                ),
+            ]),
+            body: Some("\nline1\nsomeIp={ip1}\n".to_string()),
+        });
+        let input2 = DdnsEntry::HTTP(DdnsEntryHttp {
+            url: "https://other.org/x?y={other_ip}".to_string(),
+            username: None,
+            password: None,
+            ignore_error: false,
+            method: HttpMethod::GET,
+            headers: BTreeMap::new(),
+            body: None,
+        });
+        let input3 = DdnsEntry::FILE(DdnsEntryFile {
+            file: "/etc/somewhere.conf".to_string(),
+            replace: "myAddr={other_ip}".to_string(),
+        });
+        let entries = vec![input1.clone(), input2.clone(), input3.clone()];
+
+        let actual = resolve(&entries, &address_defs, &address_values, &HashMap::new());
+
+        assert_eq!(
+            actual,
+            vec![
+                Ok(ResolvedDdnsEntry {
+                    resolved: DdnsEntry::HTTP(DdnsEntryHttp {
+                        url: "http://example.com/2001:db8:123:beef::42".to_string(),
+                        username: Some("someUser".to_string()),
+                        password: Some("somePassword".to_string()),
+                        ignore_error: true,
+                        method: HttpMethod::POST,
+                        headers: BTreeMap::from([
+                            ("Content-Typ".to_string(), "text/plain".to_string()),
+                            ("X-My-Header".to_string(), "ip=203.0.113.25".to_string(),),
+                        ]),
+                        body: Some("\nline1\nsomeIp=2001:db8:123:beef::42\n".to_string()),
+                    }),
+                    original: input1,
+                }),
+                Ok(ResolvedDdnsEntry {
+                    resolved: DdnsEntry::HTTP(DdnsEntryHttp {
+                        url: "https://other.org/x?y=203.0.113.25".to_string(),
+                        username: None,
+                        password: None,
+                        ignore_error: false,
+                        method: HttpMethod::GET,
+                        headers: BTreeMap::new(),
+                        body: None,
+                    }),
+                    original: input2,
+                }),
+                Ok(ResolvedDdnsEntry {
+                    resolved: DdnsEntry::FILE(DdnsEntryFile {
+                        file: "/etc/somewhere.conf".to_string(),
+                        replace: "myAddr=203.0.113.25".to_string(),
+                    }),
+                    original: input3,
+                }),
+            ]
+        );
     }
 }

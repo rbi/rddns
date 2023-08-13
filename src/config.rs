@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::{Error, ErrorKind, Read};
@@ -61,17 +61,24 @@ pub enum DdnsEntry {
 }
 
 impl DdnsEntry {
-    pub fn template(&self) -> &String {
+    pub fn resolvables(&self) -> Vec<String> {
         match self {
-            DdnsEntry::HTTP(http) => &http.url,
-            DdnsEntry::FILE(file) => &file.replace,
+            DdnsEntry::HTTP(http) => http.resolvables(),
+            DdnsEntry::FILE(file) => file.resolvables(),
+        }
+    }
+
+    pub fn resolve(&self, resolved: Vec<String>) -> DdnsEntry {
+        match self {
+            DdnsEntry::HTTP(http) => DdnsEntry::HTTP(http.resolve(resolved)),
+            DdnsEntry::FILE(file) => DdnsEntry::FILE(file.resolve(resolved)),
         }
     }
 }
 
 impl Display for DdnsEntry {
     fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
-        write!(f, "{}", self.template())
+        write!(f, "{:?}", self.resolvables())
     }
 }
 
@@ -82,12 +89,97 @@ pub struct DdnsEntryHttp {
     pub password: Option<String>,
     #[serde(default = "get_false")]
     pub ignore_error: bool,
+    #[serde(default)]
+    pub method: HttpMethod,
+    #[serde(default)]
+    pub headers: BTreeMap<String, String>,
+    pub body: Option<String>,
 }
 
 impl Display for DdnsEntryHttp {
     fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
         write!(f, "{}", self.url)
     }
+}
+
+impl DdnsEntryHttp {
+    fn resolvables(&self) -> Vec<String> {
+        let mut size = 1; // url
+        if self.body.is_some() {
+            size += 1;
+        }
+        size += self.headers.len();
+
+        let mut result = Vec::with_capacity(size);
+        result.push(self.url.clone());
+        if let Some(body) = &self.body {
+            result.push(body.clone());
+        }
+
+        for (_key, value) in &self.headers {
+            result.push(value.clone());
+        }
+
+        result
+    }
+
+    fn resolve(&self, resolved: Vec<String>) -> DdnsEntryHttp {
+        let mut resolved = resolved.as_slice();
+
+        let url = if let Some((first, rest)) = resolved.split_first() {
+            resolved = rest;
+            first.clone()
+        } else {
+            self.url.clone()
+        };
+
+        let body = if let Some(orig_body) = &self.body {
+            if let Some((first, rest)) = resolved.split_first() {
+                resolved = rest;
+                Some(first.clone())
+            } else {
+                Some(orig_body.clone())
+            }
+        } else {
+            None
+        };
+
+        let mut headers = BTreeMap::new();
+
+        for (header_name, header_value) in &self.headers {
+            let new_value = if let Some((first, rest)) = resolved.split_first() {
+                resolved = rest;
+                first.clone()
+            } else {
+                header_value.clone()
+            };
+            headers.insert(header_name.clone(), new_value);
+        }
+
+        DdnsEntryHttp {
+            url: url,
+            username: self.username.clone(),
+            password: self.password.clone(),
+            ignore_error: self.ignore_error,
+            method: self.method.clone(),
+            headers: headers,
+            body: body,
+        }
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Deserialize, Default)]
+pub enum HttpMethod {
+    // All Methods defined in RFC 7231
+    #[default]
+    GET,
+    HEAD,
+    POST,
+    PUT,
+    DELETE,
+    CONNECT,
+    OPTIONS,
+    TRACE,
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Deserialize)]
@@ -99,6 +191,23 @@ pub struct DdnsEntryFile {
 impl Display for DdnsEntryFile {
     fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
         write!(f, "file: {}, replace: {} ", self.file, self.replace)
+    }
+}
+
+impl DdnsEntryFile {
+    fn resolvables(&self) -> Vec<String> {
+        vec![self.replace.clone()]
+    }
+
+    fn resolve(&self, resolved: Vec<String>) -> DdnsEntryFile {
+        DdnsEntryFile {
+            file: self.file.clone(),
+            replace: if let Some(first) = resolved.first() {
+                first.clone()
+            } else {
+                self.replace.clone()
+            },
+        }
     }
 }
 
@@ -202,57 +311,63 @@ mod tests {
     #[test]
     fn can_read_maximal_config_file() {
         let config_file_content = br#"
-        [[trigger]]
-        type = "http"
-        username = "a_user"
-        password = "a_password"
-        port = 3001
+[[trigger]]
+type = "http"
+username = "a_user"
+password = "a_password"
+port = 3001
 
-        [[trigger]]
-        type = "timed"
-        interval = 5153
+[[trigger]]
+type = "timed"
+interval = 5153
 
-        [ip.addr1]
-        type = "parameter"
-        parameter = "addr1"
+[ip.addr1]
+type = "parameter"
+parameter = "addr1"
 
-        [ip.parameter_max]
-        type = "parameter"
-        parameter = "p_max"
-        base64_encoded = true
-        format = "IpNetwork"
+[ip.parameter_max]
+type = "parameter"
+parameter = "p_max"
+base64_encoded = true
+format = "IpNetwork"
 
-        [ip.some_static_addr]
-        type = "static"
-        address = "2001:DB8:123:abcd::1"
+[ip.some_static_addr]
+type = "static"
+address = "2001:DB8:123:abcd::1"
 
-        [ip.interfaceAddress]
-        type = "interface"
-        interface = "eth0"
-        network = "::/0"
+[ip.interfaceAddress]
+type = "interface"
+interface = "eth0"
+network = "::/0"
 
-        [ip.calculated_address]
-        type = "derived"
-        subnet_bits = 64
-        subnet_entry = "addr1"
-        host_entry = "some_static_addr"
+[ip.calculated_address]
+type = "derived"
+subnet_bits = 64
+subnet_entry = "addr1"
+host_entry = "some_static_addr"
 
-        [[ddns_entry]]
-        type = "http"
-        url = "http://example.com/{addr1}"
-        username = "someUser"
-        password = "somePassword"
-        ignore_error = true
+[[ddns_entry]]
+type = "http"
+url = "http://example.com/{addr1}"
+username = "someUser"
+password = "somePassword"
+ignore_error = true
+method = "POST"
+headers = { Content-Typ = "text/plain", X-My-Header = "ip={some_static_addr}" }
+body = """
+    line1
+    someIp={interfaceAddress}
+"""
 
-        [[ddns_entry]]
-        type = "http"
-        url = "https://other.org/x?y={some_static_addr}"
+[[ddns_entry]]
+type = "http"
+url = "https://other.org/x?y={some_static_addr}"
 
-        [[ddns_entry]]
-        type = "file"
-        file = "/etc/somewhere.conf"
-        replace = "myAddr={some_static_addr}"
-        "#;
+[[ddns_entry]]
+type = "file"
+file = "/etc/somewhere.conf"
+replace = "myAddr={some_static_addr}"
+"#;
 
         let (_temp_dir, config_file_path) = create_temp_file(config_file_content);
 
@@ -310,12 +425,24 @@ mod tests {
                     username: Some("someUser".to_string()),
                     password: Some("somePassword".to_string()),
                     ignore_error: true,
+                    method: HttpMethod::POST,
+                    headers: BTreeMap::from([
+                        ("Content-Typ".to_string(), "text/plain".to_string()),
+                        (
+                            "X-My-Header".to_string(),
+                            "ip={some_static_addr}".to_string(),
+                        ),
+                    ]),
+                    body: Some("    line1\n    someIp={interfaceAddress}\n".to_string()),
                 }),
                 DdnsEntry::HTTP(DdnsEntryHttp {
                     url: "https://other.org/x?y={some_static_addr}".to_string(),
                     username: None,
                     password: None,
                     ignore_error: false,
+                    method: HttpMethod::GET,
+                    headers: BTreeMap::new(),
+                    body: None,
                 }),
                 DdnsEntry::FILE(DdnsEntryFile {
                     file: "/etc/somewhere.conf".to_string(),
