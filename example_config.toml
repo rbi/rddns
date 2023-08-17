@@ -101,6 +101,12 @@ password = "secret"
 #
 # Default if missing: "false"
 ignore_error = true
+# In case of an HTTPS URL specifies how to validate the TLS certificate presented by the server. If not specified the
+# default is "mozilla". Possible values are:
+# "mozilla": Uses the Mozilla root certificates for validation. They are embedded in the rddns binary.
+# "system": Uses the root certificates of the system that rddns is running on.
+# "disable": Trust all server certificates instead of checking its signature.
+server_cert_validation = "mozilla"
 
 # The following example demonstrates how to define custom HTTP headers, body and method. The URL that is called
 # would be resolved to "http://example.com/dynupdate/2001:DB8:123:abcd::1?doUpdate=true" as "otherAddress" is configured

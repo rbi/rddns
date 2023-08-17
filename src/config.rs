@@ -90,6 +90,8 @@ pub struct DdnsEntryHttp {
     #[serde(default = "get_false")]
     pub ignore_error: bool,
     #[serde(default)]
+    pub server_cert_validation: ServerCertValidation,
+    #[serde(default)]
     pub method: HttpMethod,
     #[serde(default)]
     pub headers: BTreeMap<String, String>,
@@ -161,6 +163,7 @@ impl DdnsEntryHttp {
             username: self.username.clone(),
             password: self.password.clone(),
             ignore_error: self.ignore_error,
+            server_cert_validation: self.server_cert_validation.clone(),
             method: self.method.clone(),
             headers: headers,
             body: body,
@@ -168,7 +171,18 @@ impl DdnsEntryHttp {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug, Deserialize, Default)]
+#[derive(Clone, Default, Eq, PartialEq, Hash, Debug, Deserialize)]
+pub enum ServerCertValidation {
+    #[serde(rename = "mozilla")]
+    #[default]
+    MOZILLA,
+    #[serde(rename = "system")]
+    SYSTEM,
+    #[serde(rename = "disabled")]
+    DISABLED,
+}
+
+#[derive(Clone, Default, Eq, PartialEq, Hash, Debug, Deserialize)]
 pub enum HttpMethod {
     // All Methods defined in RFC 7231
     #[default]
@@ -352,6 +366,7 @@ url = "http://example.com/{addr1}"
 username = "someUser"
 password = "somePassword"
 ignore_error = true
+server_cert_validation = "system"
 method = "POST"
 headers = { Content-Typ = "text/plain", X-My-Header = "ip={some_static_addr}" }
 body = """
@@ -425,6 +440,7 @@ replace = "myAddr={some_static_addr}"
                     username: Some("someUser".to_string()),
                     password: Some("somePassword".to_string()),
                     ignore_error: true,
+                    server_cert_validation: ServerCertValidation::SYSTEM,
                     method: HttpMethod::POST,
                     headers: BTreeMap::from([
                         ("Content-Typ".to_string(), "text/plain".to_string()),
@@ -440,6 +456,7 @@ replace = "myAddr={some_static_addr}"
                     username: None,
                     password: None,
                     ignore_error: false,
+                    server_cert_validation: ServerCertValidation::MOZILLA,
                     method: HttpMethod::GET,
                     headers: BTreeMap::new(),
                     body: None,

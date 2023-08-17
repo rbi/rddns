@@ -164,7 +164,7 @@ mod tests {
     use super::*;
     use crate::config::{
         DdnsEntryFile, DdnsEntryHttp, HttpMethod, IpAddressDerived, IpAddressFromParameter,
-        IpAddressStatic,
+        IpAddressStatic, ServerCertValidation,
     };
     use std::collections::BTreeMap;
 
@@ -177,6 +177,7 @@ mod tests {
             username: Some("user".to_string()),
             password: Some("pass".to_string()),
             ignore_error: true,
+            server_cert_validation: ServerCertValidation::MOZILLA,
         })
     }
 
@@ -189,6 +190,7 @@ mod tests {
             username: None,
             password: None,
             ignore_error: false,
+            server_cert_validation: ServerCertValidation::MOZILLA,
         })
     }
 
@@ -226,6 +228,7 @@ mod tests {
                     username: Some("user".to_string()),
                     password: Some("pass".to_string()),
                     ignore_error: true,
+                    server_cert_validation: ServerCertValidation::MOZILLA,
                 }),
                 original: some_host_entry(),
             }),
@@ -238,6 +241,7 @@ mod tests {
                     username: None,
                     password: None,
                     ignore_error: false,
+                    server_cert_validation: ServerCertValidation::MOZILLA,
                 }),
                 original: other_host_entry(),
             }),
@@ -283,6 +287,7 @@ mod tests {
                     username: Some("user".to_string()),
                     password: Some("pass".to_string()),
                     ignore_error: true,
+                    server_cert_validation: ServerCertValidation::MOZILLA,
                 }),
                 original: some_host_entry(),
             }),
@@ -295,6 +300,7 @@ mod tests {
                     username: None,
                     password: None,
                     ignore_error: false,
+                    server_cert_validation: ServerCertValidation::MOZILLA,
                 }),
                 original: other_host_entry(),
             }),
@@ -379,6 +385,7 @@ mod tests {
                     username: Some("user".to_string()),
                     password: Some("pass".to_string()),
                     ignore_error: true,
+                    server_cert_validation: ServerCertValidation::MOZILLA,
                 }),
                 original: some_host_entry(),
             }),
@@ -391,6 +398,7 @@ mod tests {
                     username: None,
                     password: None,
                     ignore_error: false,
+                    server_cert_validation: ServerCertValidation::MOZILLA,
                 }),
                 original: other_host_entry(),
             }),
@@ -503,6 +511,7 @@ mod tests {
                     username: Some("user".to_string()),
                     password: Some("pass".to_string()),
                     ignore_error: true,
+                    server_cert_validation: ServerCertValidation::MOZILLA,
                 }),
                 original: some_host_entry(),
             }),
@@ -515,6 +524,7 @@ mod tests {
                     username: None,
                     password: None,
                     ignore_error: false,
+                    server_cert_validation: ServerCertValidation::MOZILLA,
                 }),
                 original: other_host_entry(),
             }),
@@ -547,13 +557,11 @@ mod tests {
             username: Some("someUser".to_string()),
             password: Some("somePassword".to_string()),
             ignore_error: true,
+            server_cert_validation: ServerCertValidation::MOZILLA,
             method: HttpMethod::POST,
             headers: BTreeMap::from([
                 ("Content-Typ".to_string(), "text/plain".to_string()),
-                (
-                    "X-My-Header".to_string(),
-                    "ip={other_ip}".to_string(),
-                ),
+                ("X-My-Header".to_string(), "ip={other_ip}".to_string()),
             ]),
             body: Some("\nline1\nsomeIp={ip1}\n".to_string()),
         });
@@ -562,6 +570,7 @@ mod tests {
             username: None,
             password: None,
             ignore_error: false,
+            server_cert_validation: ServerCertValidation::MOZILLA,
             method: HttpMethod::GET,
             headers: BTreeMap::new(),
             body: None,
@@ -583,6 +592,7 @@ mod tests {
                         username: Some("someUser".to_string()),
                         password: Some("somePassword".to_string()),
                         ignore_error: true,
+                        server_cert_validation: ServerCertValidation::MOZILLA,
                         method: HttpMethod::POST,
                         headers: BTreeMap::from([
                             ("Content-Typ".to_string(), "text/plain".to_string()),
@@ -598,6 +608,7 @@ mod tests {
                         username: None,
                         password: None,
                         ignore_error: false,
+                        server_cert_validation: ServerCertValidation::MOZILLA,
                         method: HttpMethod::GET,
                         headers: BTreeMap::new(),
                         body: None,
