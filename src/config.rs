@@ -82,7 +82,10 @@ impl DdnsEntry {
 
 impl Display for DdnsEntry {
     fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
-        write!(f, "{:?}", self.resolvables())
+        match self {
+            DdnsEntry::HTTP(http) => http.fmt(f),
+            DdnsEntry::FILE(file) => file.fmt(f),
+        }
     }
 }
 
@@ -105,7 +108,7 @@ pub struct DdnsEntryHttp {
 
 impl Display for DdnsEntryHttp {
     fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
-        write!(f, "{}", self.url)
+        write!(f, "{} {}", self.method, self.url)
     }
 }
 
@@ -259,6 +262,12 @@ pub enum HttpMethod {
     CONNECT,
     OPTIONS,
     TRACE,
+}
+
+impl Display for HttpMethod {
+    fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Deserialize)]
