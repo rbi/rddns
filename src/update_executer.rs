@@ -1,4 +1,7 @@
 use std::collections::HashMap;
+
+use std::fs::File;
+use std::io::BufReader;
 use std::sync::{Arc, Mutex};
 
 use hyper::client::HttpConnector;
@@ -6,7 +9,7 @@ use hyper::header::AUTHORIZATION;
 use hyper::{Body, Client, Request, Uri};
 use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use rustls::client::ServerCertVerifier;
-use rustls::{ClientConfig, OwnedTrustAnchor, RootCertStore};
+use rustls::{Certificate, ClientConfig, OwnedTrustAnchor, RootCertStore};
 use rustls_native_certs::load_native_certs;
 use webpki_roots::TLS_SERVER_ROOTS;
 
@@ -31,19 +34,22 @@ impl UpdateExecutor {
 
     pub async fn update_dns(&self, ddns_entry: &ResolvedDdnsEntry) -> Result<(), String> {
         match &ddns_entry.resolved {
-            DdnsEntry::HTTP(http) => update_via_http(self.get_client(http), http).await,
+            DdnsEntry::HTTP(http) => update_via_http(self.get_client(http)?, http).await,
             DdnsEntry::FILE(file) => update_file(file).await,
         }
     }
 
-    fn get_client(&self, http: &DdnsEntryHttp) -> Client<HttpsConnector<HttpConnector>> {
+    fn get_client(
+        &self,
+        http: &DdnsEntryHttp,
+    ) -> Result<Client<HttpsConnector<HttpConnector>>, String> {
         let mut clients = self.clients.lock().unwrap();
         match clients.get(&http.server_cert_validation) {
-            Some(client) => client.clone(),
+            Some(client) => Ok(client.clone()),
             None => {
-                let client = create_client(&http.server_cert_validation);
+                let client = create_client(&http.server_cert_validation)?;
                 clients.insert(http.server_cert_validation.clone(), client.clone());
-                client
+                Ok(client)
             }
         }
     }
@@ -51,8 +57,8 @@ impl UpdateExecutor {
 
 fn create_client(
     server_cert_validation: &ServerCertValidation,
-) -> Client<HttpsConnector<HttpConnector>> {
-    let config = match server_cert_validation {
+) -> Result<Client<HttpsConnector<HttpConnector>>, String> {
+    let config: Result<ClientConfig, String> = match server_cert_validation {
         ServerCertValidation::MOZILLA => {
             let mut root_store = RootCertStore::empty();
             root_store.add_server_trust_anchors(TLS_SERVER_ROOTS.iter().map(|ta| {
@@ -62,10 +68,10 @@ fn create_client(
                     ta.name_constraints,
                 )
             }));
-            ClientConfig::builder()
+            Ok(ClientConfig::builder()
                 .with_safe_defaults()
                 .with_root_certificates(root_store)
-                .with_no_client_auth()
+                .with_no_client_auth())
         }
         ServerCertValidation::SYSTEM => {
             let mut root_store = RootCertStore::empty();
@@ -80,23 +86,57 @@ fn create_client(
                 }
                 Err(err) => warn!("Failed to load system CA certificates: {}", err),
             };
-            ClientConfig::builder()
+            Ok(ClientConfig::builder()
                 .with_safe_defaults()
                 .with_root_certificates(root_store)
-                .with_no_client_auth()
+                .with_no_client_auth())
         }
-        ServerCertValidation::DISABLED => ClientConfig::builder()
+        ServerCertValidation::CUSTOM(path) => {
+            let file = File::open(path.ca.clone()).map_err(|err| {
+                format!(
+                    "Failed to open server_cert_validation ca file '{}': {}",
+                    path.ca.display(),
+                    err.to_string()
+                )
+            })?;
+
+            let mut reader = BufReader::new(file);
+            let certs = rustls_pemfile::certs(&mut reader).map_err(|err| {
+                format!(
+                    "Failed to read server_cert_validation ca file '{}': {}",
+                    path.ca.display(),
+                    err.to_string()
+                )
+            })?;
+
+            let mut root_store = RootCertStore::empty();
+            for cert in certs.into_iter().map(Certificate) {
+                root_store.add(&cert).map_err(|err| {
+                    format!(
+                        "Failed to read server_cert_validation ca file '{}': {}",
+                        path.ca.display(),
+                        err.to_string()
+                    )
+                })?;
+            }
+
+            Ok(ClientConfig::builder()
+                .with_safe_defaults()
+                .with_root_certificates(root_store)
+                .with_no_client_auth())
+        }
+        ServerCertValidation::DISABLED => Ok(ClientConfig::builder()
             .with_safe_defaults()
             .with_custom_certificate_verifier(Arc::new(TrustAllCerts {}))
-            .with_no_client_auth(),
+            .with_no_client_auth()),
     };
 
     let https_connector = HttpsConnectorBuilder::new()
-        .with_tls_config(config)
+        .with_tls_config(config?)
         .https_or_http()
         .enable_http1()
         .build();
-    Client::builder().build(https_connector)
+    Ok(Client::builder().build(https_connector))
 }
 
 struct TrustAllCerts {}

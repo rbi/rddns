@@ -105,8 +105,12 @@ ignore_error = true
 # default is "mozilla". Possible values are:
 # "mozilla": Uses the Mozilla root certificates for validation. They are embedded in the rddns binary.
 # "system": Uses the root certificates of the system that rddns is running on.
+# "custom": Use a specified ca certificate for the validation of the server certificate.
 # "disable": Trust all server certificates instead of checking its signature.
 server_cert_validation = "mozilla"
+# When using type "custom" an additional parameter is needed which points to the CA certificate that should be used to
+# validate the certificate presented by the server. The certificate must be stored in the PEM format.
+# server_cert_validation = { type = "custom", ca = "./some/path/myCa.pem" }
 
 # The following example demonstrates how to define custom HTTP headers, body and method. The URL that is called
 # would be resolved to "http://example.com/dynupdate/2001:DB8:123:abcd::1?doUpdate=true" as "otherAddress" is configured

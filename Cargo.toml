@@ -25,6 +25,7 @@ base64 = "0.21.2"
 pnet = "0.33.0"
 ipnetwork = "0.20.0"
 cidr-utils = "0.5.10"
+rustls-pemfile = "1.0.3"
 
 [dev-dependencies]
 tempdir = "0.3.7"

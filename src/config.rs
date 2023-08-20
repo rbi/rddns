@@ -1,9 +1,13 @@
+use serde::de::{self, MapAccess, Visitor};
+use serde::{Deserialize, Deserializer};
 use std::collections::{BTreeMap, HashMap};
-use std::fmt::{Display, Formatter};
+use std::fmt::{self, Display, Formatter};
 use std::fs::File;
 use std::io::{Error, ErrorKind, Read};
+use std::marker::PhantomData;
 use std::net::IpAddr;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
 pub struct Config {
@@ -90,6 +94,7 @@ pub struct DdnsEntryHttp {
     #[serde(default = "get_false")]
     pub ignore_error: bool,
     #[serde(default)]
+    #[serde(deserialize_with = "deserialize_server_cert_validation")]
     pub server_cert_validation: ServerCertValidation,
     #[serde(default)]
     pub method: HttpMethod,
@@ -172,14 +177,74 @@ impl DdnsEntryHttp {
 }
 
 #[derive(Clone, Default, Eq, PartialEq, Hash, Debug, Deserialize)]
+#[serde(tag = "type")]
 pub enum ServerCertValidation {
     #[serde(rename = "mozilla")]
     #[default]
     MOZILLA,
     #[serde(rename = "system")]
     SYSTEM,
+    #[serde(rename = "custom")]
+    CUSTOM(ServerCertValidationCustom),
     #[serde(rename = "disabled")]
     DISABLED,
+}
+
+impl FromStr for ServerCertValidation {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "mozilla" => Ok(ServerCertValidation::MOZILLA),
+            "system" => Ok(ServerCertValidation::SYSTEM),
+            "disabled" => Ok(ServerCertValidation::DISABLED),
+            _ => Err(format!(
+                "Cannot deserialize \"{}\" as server_cert_validation option.",
+                s
+            )),
+        }
+    }
+}
+
+// based on https://github.com/serde-rs/serde-rs.github.io/blob/7ea65bc1a4b2d8c6ed6bc7350e60d4c0f2cff454/_src/string-or-struct.md
+fn deserialize_server_cert_validation<'de, T, D>(deserializer: D) -> Result<T, D::Error>
+where
+    T: Deserialize<'de> + FromStr<Err = String>,
+    D: Deserializer<'de>,
+{
+    struct StringOrStruct<T>(PhantomData<fn() -> T>);
+
+    impl<'de, T> Visitor<'de> for StringOrStruct<T>
+    where
+        T: Deserialize<'de> + FromStr<Err = String>,
+    {
+        type Value = T;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("string or map")
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<T, E>
+        where
+            E: de::Error,
+        {
+            Ok(FromStr::from_str(value).unwrap())
+        }
+
+        fn visit_map<M>(self, map: M) -> Result<T, M::Error>
+        where
+            M: MapAccess<'de>,
+        {
+            Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))
+        }
+    }
+
+    deserializer.deserialize_any(StringOrStruct(PhantomData))
+}
+
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Deserialize)]
+pub struct ServerCertValidationCustom {
+    pub ca: PathBuf,
 }
 
 #[derive(Clone, Default, Eq, PartialEq, Hash, Debug, Deserialize)]
@@ -366,13 +431,18 @@ url = "http://example.com/{addr1}"
 username = "someUser"
 password = "somePassword"
 ignore_error = true
-server_cert_validation = "system"
+server_cert_validation = { type = "custom", ca = "./some/path/myCa.pem" }
 method = "POST"
 headers = { Content-Typ = "text/plain", X-My-Header = "ip={some_static_addr}" }
 body = """
     line1
     someIp={interfaceAddress}
 """
+
+[[ddns_entry]]
+type = "http"
+url = "https://ur.l"
+server_cert_validation = "system"
 
 [[ddns_entry]]
 type = "http"
@@ -440,7 +510,11 @@ replace = "myAddr={some_static_addr}"
                     username: Some("someUser".to_string()),
                     password: Some("somePassword".to_string()),
                     ignore_error: true,
-                    server_cert_validation: ServerCertValidation::SYSTEM,
+                    server_cert_validation: ServerCertValidation::CUSTOM(
+                        ServerCertValidationCustom {
+                            ca: PathBuf::from("./some/path/myCa.pem"),
+                        },
+                    ),
                     method: HttpMethod::POST,
                     headers: BTreeMap::from([
                         ("Content-Typ".to_string(), "text/plain".to_string()),
@@ -450,6 +524,16 @@ replace = "myAddr={some_static_addr}"
                         ),
                     ]),
                     body: Some("    line1\n    someIp={interfaceAddress}\n".to_string()),
+                }),
+                DdnsEntry::HTTP(DdnsEntryHttp {
+                    url: "https://ur.l".to_string(),
+                    username: None,
+                    password: None,
+                    ignore_error: false,
+                    server_cert_validation: ServerCertValidation::SYSTEM,
+                    method: HttpMethod::GET,
+                    headers: BTreeMap::new(),
+                    body: None,
                 }),
                 DdnsEntry::HTTP(DdnsEntryHttp {
                     url: "https://other.org/x?y={some_static_addr}".to_string(),
