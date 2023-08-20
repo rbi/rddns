@@ -2,7 +2,7 @@ extern crate futures;
 extern crate hyper;
 extern crate tokio;
 
-mod rddns_driver;
+pub mod rddns_driver;
 
 use rddns_driver::RddnsProcess;
 
