@@ -1,12 +1,14 @@
+use std::cmp::min;
 use std::collections::HashMap;
 
 use std::fs::File;
 use std::io::BufReader;
 use std::sync::{Arc, Mutex};
 
+use hyper::body::HttpBody;
 use hyper::client::HttpConnector;
 use hyper::header::AUTHORIZATION;
-use hyper::{Body, Client, Request, Uri};
+use hyper::{Body, Client, Request, Response, Uri};
 use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use rustls::client::ServerCertVerifier;
 use rustls::{Certificate, ClientConfig, OwnedTrustAnchor, RootCertStore};
@@ -186,18 +188,40 @@ async fn update_via_http(
     };
 
     let result = client
-        .request(request.body(body).unwrap())
+        .request(request.body(body).map_err(|err| err.to_string())?)
         .await
         .map_err(|err| err.to_string())?;
     let result_code = result.status().as_u16();
     if result_code < 300 {
         Ok(())
     } else {
+        let status = result.status().to_string();
+        let response = read_start_of_body(997, result).await?;
+
+        // };
         Err(format!(
-            "Failed to update DDNS entry. HTTP return code was {}.",
-            result_code
+            "Failed to update DDNS entry. HTTP response was: {}: {}",
+            status, response
         ))
     }
+}
+
+async fn read_start_of_body(capacity: usize, mut result: Response<Body>) -> Result<String, String> {
+    let mut response_buffer = String::with_capacity(capacity + 3); // for three dots at the end
+    while let Some(next) = result.data().await {
+        let chunk = next.map_err(|err| err.to_string())?;
+        let chunk = chunk.escape_ascii().to_string();
+        let chunk = &chunk[0..min(chunk.len(), capacity - response_buffer.len())];
+        response_buffer.push_str(chunk);
+
+        if response_buffer.len() >= capacity {
+            break;
+        }
+    }
+    if response_buffer.len() >= capacity {
+        response_buffer.push_str("...");
+    }
+    Ok(response_buffer)
 }
 
 async fn update_file(file: &DdnsEntryFile) -> Result<(), String> {
