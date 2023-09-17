@@ -166,6 +166,8 @@ async fn update_via_http(
     let mut request = Request::builder();
     request = request.uri(uri);
 
+    request = request.method(ddns_entry.method.to_string().as_str());
+
     let auth_header_value = ddns_entry.username.as_ref().map(|username| {
         ddns_entry.password.as_ref().map_or(
             to_auth_header_value_no_password(username),
