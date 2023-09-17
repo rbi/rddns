@@ -252,7 +252,7 @@ pub struct ServerCertValidationCustom {
 
 #[derive(Clone, Default, Eq, PartialEq, Hash, Debug, Deserialize)]
 pub enum HttpMethod {
-    // All Methods defined in RFC 7231
+    // All Methods defined in RFC 7231 plus PATCH (RFC 5789)
     #[default]
     GET,
     HEAD,
@@ -262,6 +262,7 @@ pub enum HttpMethod {
     CONNECT,
     OPTIONS,
     TRACE,
+    PATCH
 }
 
 impl Display for HttpMethod {
