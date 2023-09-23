@@ -27,7 +27,7 @@ ARG TARGET_PLATFORM=x86_64-unknown-linux-musl
 # install
 COPY --from=builder /work/target/${TARGET_PLATFORM}/release/rddns /rddns
 
-VOLUME /config/config.toml
+VOLUME /config
 
 ENTRYPOINT ["/rddns", "-c", "/config/config.toml"]
 CMD ["trigger"]
