@@ -1,6 +1,6 @@
 [package]
 name = "rddns"
-version = "0.3.0"
+version = "1.0.0"
 authors = ["Raik Bieniek <dev@voidnode.de>"]
 edition = "2021"
 
