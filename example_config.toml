@@ -145,6 +145,20 @@ replace = """{
   "otherIP" : "{otherAddress}"
 }"""
 
+# The following example shows how to edit a cloudflare record without using the http type. More details what these fields
+# are can you find here: https://developers.cloudflare.com/api/operations/dns-records-for-a-zone-update-dns-record
+[[ddns_entry]]
+type = "cloudflare"
+zone_id = ""
+record_id = ""
+record_ttl = 1 # Auto
+record_name = "@"
+record_proxied = false
+record_comment = ""
+record_type = "AAAA"
+record_content = "{calculated_address}"
+api_token = ""
+
 ##
 ## triggers
 ##

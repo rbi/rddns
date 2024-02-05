@@ -16,6 +16,7 @@ tokio = { version = "1.28.2", features = ["fs", "rt-multi-thread", "time"] }
 toml = "0.7.4"
 serde = "1.0.163"
 serde_derive = "1.0.163"
+serde_json = "1.0.113"
 regex = "1.8.3"
 lazy_static = "1.4.0"
 log = "0.4.18"

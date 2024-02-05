@@ -82,9 +82,16 @@ async fn resolve(
 ) -> Vec<Result<ResolvedDdnsEntry, ResolveFailed>> {
     let resolved_addresses = resolve_addresses(address_defs, address_actual, address_cache).await;
 
-    entries
-        .iter()
-        .map(|entry| resolve_entry(entry, &resolved_addresses))
+    entries.clone()
+        .into_iter()
+        .map(|entry| {
+            if let DdnsEntry::CLOUDFLARE(entry) = entry {
+                DdnsEntry::HTTP(entry.to_http())
+            } else {
+                entry
+            }
+        })
+        .map(|entry| resolve_entry(&entry, &resolved_addresses))
         .collect()
 }
 

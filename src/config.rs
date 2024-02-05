@@ -6,8 +6,11 @@ use std::fs::File;
 use std::io::{Error, ErrorKind, Read};
 use std::marker::PhantomData;
 use std::net::IpAddr;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use serde_json::json;
+use stunclient::just_give_me_the_udp_socket_and_its_external_address;
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
 pub struct Config {
@@ -62,6 +65,8 @@ pub enum DdnsEntry {
     HTTP(DdnsEntryHttp),
     #[serde(rename = "file")]
     FILE(DdnsEntryFile),
+    #[serde(rename = "cloudflare")]
+    CLOUDFLARE(DdnsEntryCloudflare)
 }
 
 impl DdnsEntry {
@@ -69,6 +74,7 @@ impl DdnsEntry {
         match self {
             DdnsEntry::HTTP(http) => http.resolvables(),
             DdnsEntry::FILE(file) => file.resolvables(),
+            _ => panic!("Invalid DNS Entry!"),
         }
     }
 
@@ -76,6 +82,7 @@ impl DdnsEntry {
         match self {
             DdnsEntry::HTTP(http) => DdnsEntry::HTTP(http.resolve(resolved)),
             DdnsEntry::FILE(file) => DdnsEntry::FILE(file.resolve(resolved)),
+            _ => panic!("Invalid DNS Entry!"),
         }
     }
 }
@@ -85,6 +92,7 @@ impl Display for DdnsEntry {
         match self {
             DdnsEntry::HTTP(http) => http.fmt(f),
             DdnsEntry::FILE(file) => file.fmt(f),
+            DdnsEntry::CLOUDFLARE(cf) => cf.fmt(f),
         }
     }
 }
@@ -104,6 +112,61 @@ pub struct DdnsEntryHttp {
     #[serde(default)]
     pub headers: BTreeMap<String, String>,
     pub body: Option<String>,
+}
+
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Deserialize)]
+pub struct DdnsEntryCloudflare {
+    pub zone_id: String,
+    pub record_id: String,
+    pub record_name: String,
+    pub record_type: String,
+    pub record_proxied: bool,
+    pub record_content: String,
+    pub record_comment: String,
+    #[serde(default = "default_ttl")]
+    pub record_ttl: u16,
+    pub api_token: String,
+    #[serde(default = "get_false")]
+    pub ignore_error: bool,
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_server_cert_validation")]
+    pub server_cert_validation: ServerCertValidation
+}
+
+impl DdnsEntryCloudflare {
+
+    pub fn to_http(&self) -> DdnsEntryHttp {
+        DdnsEntryHttp {
+            url: format!("https://api.cloudflare.com/client/v4/zones/{}/dns_records/{}", self.zone_id, self.record_id),
+            headers: BTreeMap::from(
+                [
+                    (String::from("Content-Type"), String::from("application/json")),
+                    (String::from("Authorization"), format!("Bearer {}", self.api_token))
+                ]
+            ),
+            body: Some(serde_json::to_string_pretty(&json!({ // Pretty print is required, otherwise the placeholder detection is triggered!
+                "content": self.record_content.clone(),
+                "name": self.record_name.clone(),
+                "proxied": self.record_proxied.clone(),
+                "type": self.record_type.clone(),
+                "comment": self.record_comment.clone(),
+                "tags": [],
+                "ttl": self.record_ttl.clone()
+            })).unwrap()),
+            method: HttpMethod::PUT,
+            ignore_error: self.ignore_error,
+            server_cert_validation: self.server_cert_validation.clone(),
+            password: None,
+            username: None
+        }
+    }
+
+}
+
+impl Display for DdnsEntryCloudflare {
+    fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
+        write!(f, "{} {}", self.zone_id, self.record_id)
+    }
 }
 
 impl Display for DdnsEntryHttp {
@@ -381,6 +444,10 @@ pub fn read_config(config_file: &Path) -> Result<Config, Error> {
 
 fn get_false() -> bool {
     false
+}
+
+fn default_ttl() -> u16 {
+    1
 }
 
 fn default_interval() -> u32 {

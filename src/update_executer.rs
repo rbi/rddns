@@ -38,6 +38,7 @@ impl UpdateExecutor {
         match &ddns_entry.resolved {
             DdnsEntry::HTTP(http) => update_via_http(self.get_client(http)?, http).await,
             DdnsEntry::FILE(file) => update_file(file).await,
+            _ => Err(String::from("Invalid DNS Entry (internal error)")),
         }
     }
 
