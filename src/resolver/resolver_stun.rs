@@ -1,5 +1,5 @@
 use std::io;
-use std::io::{Error, ErrorKind};
+use std::io::{ErrorKind};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
 use stunclient::StunClient;
 use tokio::net::UdpSocket;

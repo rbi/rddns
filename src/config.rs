@@ -6,11 +6,11 @@ use std::fs::File;
 use std::io::{Error, ErrorKind, Read};
 use std::marker::PhantomData;
 use std::net::IpAddr;
-use std::ops::Deref;
+
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use serde_json::json;
-use stunclient::just_give_me_the_udp_socket_and_its_external_address;
+
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
 pub struct Config {
