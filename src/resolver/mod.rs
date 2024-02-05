@@ -327,7 +327,7 @@ mod tests {
         assert_eq!(actual, expected)
     }
 
-    #[test]
+    #[tokio::test]
     async fn resolve_handles_derived_addresses_that_reference_other_derived_addresses() {
         let mut address_defs = HashMap::new();
         address_defs.insert(
