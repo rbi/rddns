@@ -75,6 +75,15 @@ subnet_bits = 64
 subnet_entry = "otherAddress"
 host_entry = "some_address"
 
+# IP address sources of type "stun" resolves the outbound ip address. It connects to a STUN Server using udp and the STUN
+# Server returns it's own ip address.
+#
+# This is useful if you need the ip address which is behind NAT.
+[ip.resolved_address]
+type = "stun"
+stun_server = "stun.l.google.com:19302"
+ipv6 = false
+
 ##
 ## ddns_entry
 ##

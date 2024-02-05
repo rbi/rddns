@@ -311,6 +311,8 @@ pub enum IpAddress {
     Derived(IpAddressDerived),
     #[serde(rename = "interface")]
     Interface(IpAddressInterface),
+    #[serde(rename = "stun")]
+    Stun(IpAddressStun)
 }
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
@@ -349,6 +351,12 @@ pub enum FromParameterFormat {
 #[derive(Clone, PartialEq, Debug, Deserialize)]
 pub struct IpAddressStatic {
     pub address: IpAddr,
+}
+
+#[derive(Clone, PartialEq, Debug, Deserialize)]
+pub struct IpAddressStun {
+    pub stun_server: String,
+    pub ipv6: bool
 }
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
