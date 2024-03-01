@@ -82,8 +82,8 @@ fn resolve(
 ) -> Vec<Result<ResolvedDdnsEntry, ResolveFailed>> {
     let resolved_addresses = resolve_addresses(address_defs, address_actual, address_cache);
 
-    entries.clone()
-        .into_iter()
+    entries
+        .iter()
         .map(|entry| resolve_entry(&entry, &resolved_addresses))
         .collect()
 }
