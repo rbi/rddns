@@ -84,7 +84,7 @@ fn resolve(
 
     entries
         .iter()
-        .map(|entry| resolve_entry(&entry, &resolved_addresses))
+        .map(|entry| resolve_entry(entry, &resolved_addresses))
         .collect()
 }
 
