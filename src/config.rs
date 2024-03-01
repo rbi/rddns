@@ -74,7 +74,7 @@ impl DdnsEntry {
         match self {
             DdnsEntry::HTTP(http) => http.resolvables(),
             DdnsEntry::FILE(file) => file.resolvables(),
-            _ => panic!("Invalid DNS Entry!"),
+            DdnsEntry::CLOUDFLARE(cf) => cf.resolvables(),
         }
     }
 
@@ -82,7 +82,7 @@ impl DdnsEntry {
         match self {
             DdnsEntry::HTTP(http) => DdnsEntry::HTTP(http.resolve(resolved)),
             DdnsEntry::FILE(file) => DdnsEntry::FILE(file.resolve(resolved)),
-            _ => panic!("Invalid DNS Entry!"),
+            DdnsEntry::CLOUDFLARE(cf) => DdnsEntry::CLOUDFLARE(cf.resolve(resolved)),
         }
     }
 }
@@ -134,33 +134,44 @@ pub struct DdnsEntryCloudflare {
 }
 
 impl DdnsEntryCloudflare {
-
-    pub fn to_http(&self) -> DdnsEntryHttp {
-        DdnsEntryHttp {
-            url: format!("https://api.cloudflare.com/client/v4/zones/{}/dns_records/{}", self.zone_id, self.record_id),
-            headers: BTreeMap::from(
-                [
-                    (String::from("Content-Type"), String::from("application/json")),
-                    (String::from("Authorization"), format!("Bearer {}", self.api_token))
-                ]
-            ),
-            body: Some(serde_json::to_string_pretty(&json!({ // Pretty print is required, otherwise the placeholder detection is triggered!
-                "content": self.record_content.clone(),
-                "name": self.record_name.clone(),
-                "proxied": self.record_proxied.clone(),
-                "type": self.record_type.clone(),
-                "comment": self.record_comment.clone(),
-                "tags": [],
-                "ttl": self.record_ttl.clone()
-            })).unwrap()),
-            method: HttpMethod::PUT,
-            ignore_error: self.ignore_error,
-            server_cert_validation: self.server_cert_validation.clone(),
-            password: None,
-            username: None
-        }
+    fn resolvables(&self) -> Vec<String> {
+        vec![
+            self.record_content.clone(),
+            self.record_comment.clone()
+        ]    
     }
 
+    fn resolve(&self, resolved: Vec<String>) -> DdnsEntryCloudflare {
+        let mut resolved = resolved.as_slice();
+
+        let content = if let Some((first, rest)) = resolved.split_first() {
+            resolved = rest;
+            first.clone()
+        } else {
+            self.record_content.clone()
+        };
+
+        let comment = if let Some((first, rest)) = resolved.split_first() {
+            resolved = rest;
+            first.clone()
+        } else {
+            self.record_comment.clone()
+        };
+
+        DdnsEntryCloudflare {
+            zone_id: self.zone_id.clone(),
+            record_id: self.record_id.clone(),
+            record_name: self.record_name.clone(),
+            record_type: self.record_type.clone(),
+            record_proxied: self.record_proxied.clone(),
+            record_content: content,
+            record_comment: comment,
+            record_ttl: self.record_ttl.clone(),
+            api_token: self.api_token.clone(),
+            ignore_error: self.ignore_error.clone(),
+            server_cert_validation: self.server_cert_validation.clone(),
+        }
+    }
 }
 
 impl Display for DdnsEntryCloudflare {

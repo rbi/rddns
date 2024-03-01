@@ -84,13 +84,6 @@ fn resolve(
 
     entries.clone()
         .into_iter()
-        .map(|entry| {
-            if let DdnsEntry::CLOUDFLARE(entry) = entry {
-                DdnsEntry::HTTP(entry.to_http())
-            } else {
-                entry
-            }
-        })
         .map(|entry| resolve_entry(&entry, &resolved_addresses))
         .collect()
 }

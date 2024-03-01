@@ -13,9 +13,10 @@ use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use rustls::client::ServerCertVerifier;
 use rustls::{Certificate, ClientConfig, OwnedTrustAnchor, RootCertStore};
 use rustls_native_certs::load_native_certs;
+use serde_json::json;
 use webpki_roots::TLS_SERVER_ROOTS;
 
-use crate::config::ServerCertValidation;
+use crate::config::{DdnsEntryCloudflare, ServerCertValidation};
 
 use super::basic_auth_header::{to_auth_header_value, to_auth_header_value_no_password};
 use super::config::{DdnsEntry, DdnsEntryFile, DdnsEntryHttp};
@@ -36,22 +37,22 @@ impl UpdateExecutor {
 
     pub async fn update_dns(&self, ddns_entry: &ResolvedDdnsEntry) -> Result<(), String> {
         match &ddns_entry.resolved {
-            DdnsEntry::HTTP(http) => update_via_http(self.get_client(http)?, http).await,
+            DdnsEntry::HTTP(http) => update_via_http(self.get_client(&http.server_cert_validation)?, http).await,
             DdnsEntry::FILE(file) => update_file(file).await,
-            _ => Err(String::from("Invalid DNS Entry (internal error)")),
+            DdnsEntry::CLOUDFLARE(cf) => update_via_cloudflare(self.get_client(&cf.server_cert_validation)?, cf).await,
         }
     }
 
     fn get_client(
         &self,
-        http: &DdnsEntryHttp,
+        cert_validation: &ServerCertValidation,
     ) -> Result<Client<HttpsConnector<HttpConnector>>, String> {
         let mut clients = self.clients.lock().unwrap();
-        match clients.get(&http.server_cert_validation) {
+        match clients.get(cert_validation) {
             Some(client) => Ok(client.clone()),
             None => {
-                let client = create_client(&http.server_cert_validation)?;
-                clients.insert(http.server_cert_validation.clone(), client.clone());
+                let client = create_client(cert_validation)?;
+                clients.insert(cert_validation.clone(), client.clone());
                 Ok(client)
             }
         }
@@ -192,6 +193,48 @@ async fn update_via_http(
 
     let result = client
         .request(request.body(body).map_err(|err| err.to_string())?)
+        .await
+        .map_err(|err| err.to_string())?;
+    let result_code = result.status().as_u16();
+    if result_code < 300 {
+        Ok(())
+    } else {
+        let status = result.status().to_string();
+        let response = read_start_of_body(997, result).await?;
+
+        // };
+        Err(format!(
+            "Failed to update DDNS entry. HTTP response was: {}: {}",
+            status, response
+        ))
+    }
+}
+
+async fn update_via_cloudflare(client: Client<HttpsConnector<HttpConnector>>, ddns_entry: &DdnsEntryCloudflare) -> Result<(), String> {
+    let uri: Uri = format!("https://api.cloudflare.com/client/v4/zones/{}/dns_records/{}", ddns_entry.zone_id, ddns_entry.record_id).parse().unwrap();
+
+    let request = Request::builder()
+        .uri(uri)
+        .method("PUT")
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {}", ddns_entry.api_token))
+        .body(Body::from(serde_json::to_string(
+                    &json!(
+                        {
+                            "content": ddns_entry.record_content.clone(),
+                            "name": ddns_entry.record_name.clone(),
+                            "proxied": ddns_entry.record_proxied.clone(),
+                            "type": ddns_entry.record_type.clone(),
+                            "comment": ddns_entry.record_comment.clone(),
+                            "tags": [],
+                            "ttl": ddns_entry.record_ttl.clone(),
+                        }
+                    )
+        ).unwrap()));
+
+
+    let result = client
+        .request(request.map_err(|err| err.to_string())?)
         .await
         .map_err(|err| err.to_string())?;
     let result_code = result.status().as_u16();
