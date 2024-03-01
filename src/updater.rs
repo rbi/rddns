@@ -45,7 +45,6 @@ impl Updater {
         let work = self
             .resolver
             .resolve_config(&self.config, &addresses)
-            .await
             .iter()
             .map(|entry| async move {
                 match entry {

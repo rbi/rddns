@@ -4,6 +4,9 @@ version = "1.0.0"
 authors = ["Raik Bieniek <dev@voidnode.de>"]
 edition = "2021"
 
+[features]
+docker = ["dep:bollard"]
+
 [dependencies]
 hyper = {version = "0.14.26", features = ["server", "client"] }
 hyper-rustls = "0.24.0"
@@ -28,6 +31,7 @@ ipnetwork = "0.20.0"
 cidr-utils = "0.5.10"
 rustls-pemfile = "1.0.3"
 stunclient = "0.4.0"
+bollard = { version = "0.15.0", optional = true }
 
 [dev-dependencies]
 tempdir = "0.3.7"

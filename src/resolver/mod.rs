@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::net::IpAddr;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use std::sync::Mutex;
 use crate::resolver::resolver_stun::resolve_stun;
 
 use self::resolver_derived::resolve_derived;
@@ -53,18 +53,18 @@ impl Resolver {
         }
     }
 
-    pub async fn resolve_config(
+    pub fn resolve_config(
         &self,
         config: &Config,
         addresses: &HashMap<String, String>,
     ) -> Vec<Result<ResolvedDdnsEntry, ResolveFailed>> {
-        let mut cache = self.cache.lock().await;
+        let mut cache = self.cache.lock().unwrap();
         let result = resolve(
             &config.ddns_entries,
             &config.ip_addresses,
             addresses,
             &cache,
-        ).await;
+        );
 
         for new_address in addresses.into_iter() {
             cache.insert(new_address.0.clone(), new_address.1.clone());
@@ -74,13 +74,13 @@ impl Resolver {
     }
 }
 
-async fn resolve(
+fn resolve(
     entries: &Vec<DdnsEntry>,
     address_defs: &HashMap<String, IpAddress>,
     address_actual: &HashMap<String, String>,
     address_cache: &HashMap<String, String>,
 ) -> Vec<Result<ResolvedDdnsEntry, ResolveFailed>> {
-    let resolved_addresses = resolve_addresses(address_defs, address_actual, address_cache).await;
+    let resolved_addresses = resolve_addresses(address_defs, address_actual, address_cache);
 
     entries.clone()
         .into_iter()
@@ -132,7 +132,7 @@ fn resolve_entry(
     })
 }
 
-async fn resolve_addresses<'a>(
+fn resolve_addresses<'a>(
     address_defs: &HashMap<String, IpAddress>,
     address_actual: &HashMap<String, String>,
     address_cache: &HashMap<String, String>,
@@ -155,7 +155,7 @@ async fn resolve_addresses<'a>(
                 }
                 IpAddress::Derived(val) => resolve_derived(val, &resolved),
                 IpAddress::Interface(val) => resolve_interface(val),
-                IpAddress::Stun(val) => resolve_stun(val).await,
+                IpAddress::Stun(val) => resolve_stun(val),
             } {
                 Some(address) => resolved.insert(name.to_string(), address),
                 _ => None,
@@ -209,8 +209,8 @@ mod tests {
         return vec![some_host_entry(), other_host_entry()];
     }
 
-    #[tokio::test]
-    async fn resolve_handles_static_addresses() {
+    #[test]
+    fn resolve_handles_static_addresses() {
         let mut address_defs = HashMap::new();
         address_defs.insert(
             "ip1".to_string(),
@@ -263,13 +263,13 @@ mod tests {
             &address_defs,
             &address_values,
             &HashMap::new(),
-        ).await;
+        );
 
         assert_eq!(actual, expected);
     }
 
-    #[tokio::test]
-    async fn resolve_handles_parametrized_addresses() {
+    #[test]
+    fn resolve_handles_parametrized_addresses() {
         let mut address_defs = HashMap::new();
         address_defs.insert(
             "ip1".to_string(),
@@ -322,13 +322,13 @@ mod tests {
             &address_defs,
             &address_values,
             &HashMap::new(),
-        ).await;
+        );
 
         assert_eq!(actual, expected)
     }
 
-    #[tokio::test]
-    async fn resolve_handles_derived_addresses_that_reference_other_derived_addresses() {
+    #[test]
+    fn resolve_handles_derived_addresses_that_reference_other_derived_addresses() {
         let mut address_defs = HashMap::new();
         address_defs.insert(
             "net_ip1".to_string(),
@@ -420,13 +420,13 @@ mod tests {
             &address_defs,
             &HashMap::new(),
             &HashMap::new(),
-        ).await;
+        );
 
         assert_eq!(actual, expected);
     }
 
-    #[tokio::test]
-    async fn resolve_produces_failed_entry_when_no_address_def_for_placeholder_is_available() {
+    #[test]
+    fn resolve_produces_failed_entry_when_no_address_def_for_placeholder_is_available() {
         let mut address_defs = HashMap::new();
         address_defs.insert(
             "other_ip".to_string(),
@@ -445,7 +445,7 @@ mod tests {
             &address_defs,
             &address_values,
             &HashMap::new(),
-        ).await;
+        );
 
         assert_eq!(actual.len(), 2);
         assert!(actual[0].is_err());
@@ -454,8 +454,8 @@ mod tests {
         assert!(actual[1].is_ok());
     }
 
-    #[tokio::test]
-    async fn resolve_produces_failed_entry_when_no_address_for_address_def_is_available() {
+    #[test]
+    fn resolve_produces_failed_entry_when_no_address_for_address_def_is_available() {
         let mut address_defs = HashMap::new();
         address_defs.insert(
             "ip1".to_string(),
@@ -475,7 +475,7 @@ mod tests {
             &address_defs,
             &address_values,
             &HashMap::new(),
-        ).await;
+        );
 
         assert_eq!(actual.len(), 2);
         assert!(actual[0].is_err());
@@ -486,8 +486,8 @@ mod tests {
         assert_eq!(template1, "http://otherHost?ip={other_ip}");
     }
 
-    #[tokio::test]
-    async fn resolve_produces_no_error_when_fill_from_cache_is_possible() {
+    #[test]
+    fn resolve_produces_no_error_when_fill_from_cache_is_possible() {
         let mut address_defs = HashMap::new();
         address_defs.insert(
             "ip1".to_string(),
@@ -541,13 +541,13 @@ mod tests {
             }),
         ];
 
-        let actual = resolve(&some_entries(), &address_defs, &address_values, &cache).await;
+        let actual = resolve(&some_entries(), &address_defs, &address_values, &cache);
 
         assert_eq!(actual, expected);
     }
 
-    #[tokio::test]
-    async fn resolve_resolves_all_resolvable_ddns_entry_http_fields() {
+    #[test]
+    fn resolve_resolves_all_resolvable_ddns_entry_http_fields() {
         let mut address_defs = HashMap::new();
         address_defs.insert(
             "ip1".to_string(),
@@ -592,7 +592,7 @@ mod tests {
         });
         let entries = vec![input1.clone(), input2.clone(), input3.clone()];
 
-        let actual = resolve(&entries, &address_defs, &address_values, &HashMap::new()).await;
+        let actual = resolve(&entries, &address_defs, &address_values, &HashMap::new());
 
         assert_eq!(
             actual,
