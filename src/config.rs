@@ -417,9 +417,14 @@ pub struct IpAddressStatic {
 }
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
+pub enum AddressType {
+    IPV4, IPV6
+}
+
+#[derive(Clone, PartialEq, Debug, Deserialize)]
 pub struct IpAddressStun {
     pub stun_server: String,
-    pub ipv6: bool
+    pub address_type: AddressType
 }
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]

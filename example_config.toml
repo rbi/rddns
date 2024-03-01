@@ -82,7 +82,7 @@ host_entry = "some_address"
 [ip.resolved_address]
 type = "stun"
 stun_server = "stun.l.google.com:19302"
-ipv6 = false
+address_type = "IPV4"
 
 ##
 ## ddns_entry

@@ -1,9 +1,9 @@
 use std::io;
-use std::io::{ErrorKind};
+use std::io::ErrorKind;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
 use stunclient::StunClient;
 use std::net::UdpSocket;
-use crate::config::IpAddressStun;
+use crate::config::{AddressType, IpAddressStun};
 
 lazy_static!(
     static ref LOCAL_IPV4: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0);
@@ -14,12 +14,14 @@ pub fn resolve_stun(
     config: &IpAddressStun
 ) -> Option<IpAddr> {
 
-    let ip;
-    if config.ipv6 {
-        ip = get_ipv6(config.stun_server.clone());
-    } else {
-        ip = get_ipv4(config.stun_server.clone());
-    }
+    let ip = match config.address_type {
+        AddressType::IPV4 => {
+            get_ipv4(config.stun_server.clone())
+        },
+        AddressType::IPV6 => {
+            get_ipv6(config.stun_server.clone())
+        }
+    };
 
     match ip {
         Ok(addr) => {
