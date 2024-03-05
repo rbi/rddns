@@ -1,12 +1,15 @@
 mod resolver_derived;
 mod resolver_interface;
 mod resolver_parameter;
+mod resolver_stun;
 
 use regex::Regex;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::net::IpAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use std::sync::Mutex;
+use crate::resolver::resolver_stun::resolve_stun;
 
 use self::resolver_derived::resolve_derived;
 use self::resolver_interface::resolve_interface;
@@ -145,6 +148,7 @@ fn resolve_addresses<'a>(
                 }
                 IpAddress::Derived(val) => resolve_derived(val, &resolved),
                 IpAddress::Interface(val) => resolve_interface(val),
+                IpAddress::Stun(val) => resolve_stun(val),
             } {
                 Some(address) => resolved.insert(name.to_string(), address),
                 _ => None,

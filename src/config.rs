@@ -6,8 +6,11 @@ use std::fs::File;
 use std::io::{Error, ErrorKind, Read};
 use std::marker::PhantomData;
 use std::net::IpAddr;
+
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use serde_json::json;
+
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
 pub struct Config {
@@ -62,6 +65,8 @@ pub enum DdnsEntry {
     HTTP(DdnsEntryHttp),
     #[serde(rename = "file")]
     FILE(DdnsEntryFile),
+    #[serde(rename = "cloudflare")]
+    CLOUDFLARE(DdnsEntryCloudflare)
 }
 
 impl DdnsEntry {
@@ -69,6 +74,7 @@ impl DdnsEntry {
         match self {
             DdnsEntry::HTTP(http) => http.resolvables(),
             DdnsEntry::FILE(file) => file.resolvables(),
+            DdnsEntry::CLOUDFLARE(cf) => cf.resolvables(),
         }
     }
 
@@ -76,6 +82,7 @@ impl DdnsEntry {
         match self {
             DdnsEntry::HTTP(http) => DdnsEntry::HTTP(http.resolve(resolved)),
             DdnsEntry::FILE(file) => DdnsEntry::FILE(file.resolve(resolved)),
+            DdnsEntry::CLOUDFLARE(cf) => DdnsEntry::CLOUDFLARE(cf.resolve(resolved)),
         }
     }
 }
@@ -85,6 +92,7 @@ impl Display for DdnsEntry {
         match self {
             DdnsEntry::HTTP(http) => http.fmt(f),
             DdnsEntry::FILE(file) => file.fmt(f),
+            DdnsEntry::CLOUDFLARE(cf) => cf.fmt(f),
         }
     }
 }
@@ -104,6 +112,72 @@ pub struct DdnsEntryHttp {
     #[serde(default)]
     pub headers: BTreeMap<String, String>,
     pub body: Option<String>,
+}
+
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Deserialize)]
+pub struct DdnsEntryCloudflare {
+    pub zone_id: String,
+    pub record_id: String,
+    pub record_name: String,
+    pub record_type: String,
+    pub record_proxied: bool,
+    pub record_content: String,
+    pub record_comment: String,
+    #[serde(default = "default_ttl")]
+    pub record_ttl: u16,
+    pub api_token: String,
+    #[serde(default = "get_false")]
+    pub ignore_error: bool,
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_server_cert_validation")]
+    pub server_cert_validation: ServerCertValidation
+}
+
+impl DdnsEntryCloudflare {
+    fn resolvables(&self) -> Vec<String> {
+        vec![
+            self.record_content.clone(),
+            self.record_comment.clone()
+        ]    
+    }
+
+    fn resolve(&self, resolved: Vec<String>) -> DdnsEntryCloudflare {
+        let mut resolved = resolved.as_slice();
+
+        let content = if let Some((first, rest)) = resolved.split_first() {
+            resolved = rest;
+            first.clone()
+        } else {
+            self.record_content.clone()
+        };
+
+        let comment = if let Some((first, rest)) = resolved.split_first() {
+            resolved = rest;
+            first.clone()
+        } else {
+            self.record_comment.clone()
+        };
+
+        DdnsEntryCloudflare {
+            zone_id: self.zone_id.clone(),
+            record_id: self.record_id.clone(),
+            record_name: self.record_name.clone(),
+            record_type: self.record_type.clone(),
+            record_proxied: self.record_proxied.clone(),
+            record_content: content,
+            record_comment: comment,
+            record_ttl: self.record_ttl.clone(),
+            api_token: self.api_token.clone(),
+            ignore_error: self.ignore_error.clone(),
+            server_cert_validation: self.server_cert_validation.clone(),
+        }
+    }
+}
+
+impl Display for DdnsEntryCloudflare {
+    fn fmt(&self, f: &mut Formatter) -> ::std::fmt::Result {
+        write!(f, "{} {}", self.zone_id, self.record_id)
+    }
 }
 
 impl Display for DdnsEntryHttp {
@@ -311,6 +385,8 @@ pub enum IpAddress {
     Derived(IpAddressDerived),
     #[serde(rename = "interface")]
     Interface(IpAddressInterface),
+    #[serde(rename = "stun")]
+    Stun(IpAddressStun)
 }
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
@@ -352,6 +428,17 @@ pub struct IpAddressStatic {
 }
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
+pub enum AddressType {
+    IPV4, IPV6
+}
+
+#[derive(Clone, PartialEq, Debug, Deserialize)]
+pub struct IpAddressStun {
+    pub stun_server: String,
+    pub address_type: AddressType
+}
+
+#[derive(Clone, PartialEq, Debug, Deserialize)]
 pub struct IpAddressDerived {
     pub subnet_bits: u8,
     pub host_entry: String,
@@ -373,6 +460,10 @@ pub fn read_config(config_file: &Path) -> Result<Config, Error> {
 
 fn get_false() -> bool {
     false
+}
+
+fn default_ttl() -> u16 {
+    1
 }
 
 fn default_interval() -> u32 {
