@@ -12,6 +12,7 @@ Updates can be triggered by HTTP calls to a HTTP server embedded in rddns or by 
 * Different sources for IP addresses
   * IP addresses can be passed as command line or HTTP parameter
   * IP addresses can be read from network interfaces
+  * IP addresses can be detected via STUN
   * static IP addresses
   * Multiple IP addresses can be combined to new ones.
     E.g. Combine a dynamically assigned IPv6 subnet with the static IPv6 host parts of all devices in the subnet and update DynDNS entries for all of them.
@@ -19,6 +20,7 @@ Updates can be triggered by HTTP calls to a HTTP server embedded in rddns or by 
   * Execute DDNS updates by calling HTTP URLs.
     IP addresses can be inserted into the URL, headers or the body.
   * Write IP addresses to files
+  * Update DNS records at Cloudflare.
 
 # Usage
 Rddns is started by passing a configuration file as parameter.
