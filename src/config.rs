@@ -9,7 +9,6 @@ use std::net::IpAddr;
 
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use serde_json::json;
 
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
@@ -151,8 +150,7 @@ impl DdnsEntryCloudflare {
             self.record_content.clone()
         };
 
-        let comment = if let Some((first, rest)) = resolved.split_first() {
-            resolved = rest;
+        let comment = if let Some((first, _rest)) = resolved.split_first() {
             first.clone()
         } else {
             self.record_comment.clone()
