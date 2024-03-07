@@ -1,8 +1,9 @@
 [package]
 name = "rddns"
-version = "1.0.0"
+description = "A versatile DynDNS client"
 authors = ["Raik Bieniek <dev@voidnode.de>"]
 edition = "2021"
+repository = "https://github.com/rbi/rddns"
 
 [dependencies]
 hyper = {version = "0.14.26", features = ["server", "client"] }

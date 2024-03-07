@@ -1,3 +1,4 @@
+use clap::builder::Resettable;
 use clap::{Arg, ArgAction, Command};
 use regex::Regex;
 use std::collections::HashMap;
@@ -16,6 +17,8 @@ pub enum ExecutionMode {
 
 pub fn parse_command_line() -> CommandLine {
     let matches = command!()
+        // There is no version in the Cargo.toml at the moment.
+        .version(Resettable::Reset)
         .subcommand_required(true)
         .arg(Arg::new("config")
             .short('c')
