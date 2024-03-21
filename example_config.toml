@@ -57,6 +57,7 @@ address = "2001:DB8:123:abcd::1"
 type = "interface"
 interface = "eth0"
 network = "0.0.0.0/32"
+regex = false # If the interface should be filtered using a regex
 
 # IP address sources of type "derived" combine the host part and the net part of two other "ip" entries to create a new
 # IP address. The "subnet_entry" and the "host_entry" configuration options define which other IP addresses should be
