@@ -2,7 +2,7 @@ use crate::config::IpAddressInterface;
 use ipnetwork::IpNetwork;
 use pnet::datalink::{interfaces, NetworkInterface};
 use std::net::IpAddr;
-use regex::{Error, Regex};
+use regex::Regex;
 
 pub fn resolve_interface(config: &IpAddressInterface) -> Option<IpAddr> {
     config
@@ -27,7 +27,10 @@ fn get_interface(name: &str, regex: bool) -> Option<NetworkInterface> {
                 .into_iter()
                 .filter(|iface| regex.is_match(&iface.name))
                 .next(),
-            Err(err) => None,
+            Err(_err) => {
+                warn!("The regex \"{}\" couldn't be compiled.", name);
+                None
+            },
         }
     } else {
         interfaces()
