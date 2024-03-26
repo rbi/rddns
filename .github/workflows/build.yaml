@@ -1,6 +1,8 @@
 name: Build
 on:
   push:
+    branches:
+      - master
   workflow_dispatch:
 jobs:
   build-docker:
@@ -23,12 +25,12 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           push: true
-          tags: sirabien/rddns:dev-test
+          tags: sirabien/rddns:dev
       -
         name: Extract binary
         uses: shrink/actions-docker-extract@v3
         with:
-          image: sirabien/rddns:dev-test
+          image: sirabien/rddns:dev
           path: /rddns
           destination: dist/rddns-linux-amd64
       - 
