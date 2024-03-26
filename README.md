@@ -38,10 +38,8 @@ The configuration file contains the DynDNS entries that should be updated as wel
 It is described in the exemplary configuration file [example_config.toml](example_config.toml).
 
 # Install
-Currently no official pre compiled executables are available.
-They have to be created by compiling the source manually.
-
 There is however a Docker image available at [Docker Hub](https://hub.docker.com/r/sirabien/rddns).
+A pre-compiled binary for Linux/amd64 can be downloaded from Artifacts section of the Actions tab.
 
 # Build
 To build rddns Rust is required.
