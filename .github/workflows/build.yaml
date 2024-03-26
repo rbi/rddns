@@ -24,3 +24,15 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: sirabien/rddns:dev-test
+      -
+        name: Extract binary
+        uses: shrink/actions-docker-extract@v3
+        with:
+          image: sirabien/rddns:dev-test
+          path: /rddns
+          destination: dist/rddns-linux-amd64
+      - 
+        name: Upload Dist
+        uses: actions/upload-artifact@v3
+        with:
+          path: dist
