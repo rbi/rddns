@@ -21,7 +21,6 @@ jobs:
         name: Build
         uses: docker/build-push-action@v5
         with:
-          platforms: linux/amd64,linux/arm64
           push: true
           tags: sirabien/rddns:dev-test
       -
