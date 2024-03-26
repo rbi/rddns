@@ -447,6 +447,8 @@ pub struct IpAddressDerived {
 pub struct IpAddressInterface {
     pub interface: String,
     pub network: String,
+    #[serde(default = "get_false")]
+    pub regex: bool
 }
 
 pub fn read_config(config_file: &Path) -> Result<Config, Error> {
@@ -517,6 +519,7 @@ address = "2001:DB8:123:abcd::1"
 type = "interface"
 interface = "eth0"
 network = "::/0"
+regex = false
 
 [ip.calculated_address]
 type = "derived"
@@ -583,6 +586,7 @@ replace = "myAddr={some_static_addr}"
             IpAddress::Interface(IpAddressInterface {
                 interface: "eth0".parse().unwrap(),
                 network: "::/0".parse().unwrap(),
+                regex: false
             }),
         );
         ip_addresses.insert(
