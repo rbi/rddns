@@ -10,7 +10,6 @@ use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-
 #[derive(Clone, PartialEq, Debug, Deserialize)]
 pub struct Config {
     #[serde(default)]
@@ -65,7 +64,7 @@ pub enum DdnsEntry {
     #[serde(rename = "file")]
     FILE(DdnsEntryFile),
     #[serde(rename = "cloudflare")]
-    CLOUDFLARE(DdnsEntryCloudflare)
+    CLOUDFLARE(DdnsEntryCloudflare),
 }
 
 impl DdnsEntry {
@@ -129,15 +128,12 @@ pub struct DdnsEntryCloudflare {
     pub ignore_error: bool,
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_server_cert_validation")]
-    pub server_cert_validation: ServerCertValidation
+    pub server_cert_validation: ServerCertValidation,
 }
 
 impl DdnsEntryCloudflare {
     fn resolvables(&self) -> Vec<String> {
-        vec![
-            self.record_content.clone(),
-            self.record_comment.clone()
-        ]    
+        vec![self.record_content.clone(), self.record_comment.clone()]
     }
 
     fn resolve(&self, resolved: Vec<String>) -> DdnsEntryCloudflare {
@@ -334,7 +330,7 @@ pub enum HttpMethod {
     CONNECT,
     OPTIONS,
     TRACE,
-    PATCH
+    PATCH,
 }
 
 impl Display for HttpMethod {
@@ -384,7 +380,7 @@ pub enum IpAddress {
     #[serde(rename = "interface")]
     Interface(IpAddressInterface),
     #[serde(rename = "stun")]
-    Stun(IpAddressStun)
+    Stun(IpAddressStun),
 }
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
@@ -427,13 +423,14 @@ pub struct IpAddressStatic {
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
 pub enum AddressType {
-    IPV4, IPV6
+    IPV4,
+    IPV6,
 }
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
 pub struct IpAddressStun {
     pub stun_server: String,
-    pub address_type: AddressType
+    pub address_type: AddressType,
 }
 
 #[derive(Clone, PartialEq, Debug, Deserialize)]
@@ -447,8 +444,17 @@ pub struct IpAddressDerived {
 pub struct IpAddressInterface {
     pub interface: String,
     pub network: String,
-    #[serde(default = "get_false")]
-    pub regex: bool
+    #[serde(default)]
+    pub match_mode: TextMatchMode,
+}
+
+#[derive(Clone, Default, Eq, PartialEq, Hash, Debug, Deserialize)]
+pub enum TextMatchMode {
+    #[serde(rename = "exact")]
+    #[default]
+    EXACT,
+    #[serde(rename = "regex")]
+    REGEX,
 }
 
 pub fn read_config(config_file: &Path) -> Result<Config, Error> {
@@ -519,7 +525,7 @@ address = "2001:DB8:123:abcd::1"
 type = "interface"
 interface = "eth0"
 network = "::/0"
-regex = false
+match_mode = "exact"
 
 [ip.calculated_address]
 type = "derived"
@@ -586,7 +592,7 @@ replace = "myAddr={some_static_addr}"
             IpAddress::Interface(IpAddressInterface {
                 interface: "eth0".parse().unwrap(),
                 network: "::/0".parse().unwrap(),
-                regex: false
+                match_mode: TextMatchMode::EXACT,
             }),
         );
         ip_addresses.insert(
