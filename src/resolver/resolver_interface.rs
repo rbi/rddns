@@ -1,8 +1,8 @@
-use crate::config::IpAddressInterface;
+use crate::config::{IpAddressInterface, TextMatchMode};
 use ipnetwork::IpNetwork;
 use pnet::datalink::{interfaces, NetworkInterface};
-use std::net::IpAddr;
 use regex::Regex;
+use std::net::IpAddr;
 
 pub fn resolve_interface(config: &IpAddressInterface) -> Option<IpAddr> {
     config
@@ -16,13 +16,14 @@ pub fn resolve_interface(config: &IpAddressInterface) -> Option<IpAddr> {
         })
         .ok()
         .and_then(|network| {
-            get_interface(&config.interface, config.regex).and_then(|iface| get_ip_address(&iface, &network))
+            get_interface(&config.interface, &config.match_mode)
+                .and_then(|iface| get_ip_address(&iface, &network))
         })
 }
 
-fn get_interface(name: &str, regex: bool) -> Option<NetworkInterface> {
-    if regex {
-        match Regex::new(name) {
+fn get_interface(name: &str, match_mode: &TextMatchMode) -> Option<NetworkInterface> {
+    match match_mode {
+        TextMatchMode::REGEX => match Regex::new(name) {
             Ok(regex) => interfaces()
                 .into_iter()
                 .filter(|iface| regex.is_match(&iface.name))
@@ -30,13 +31,12 @@ fn get_interface(name: &str, regex: bool) -> Option<NetworkInterface> {
             Err(_err) => {
                 warn!("The regex \"{}\" couldn't be compiled.", name);
                 None
-            },
-        }
-    } else {
-        interfaces()
+            }
+        },
+        TextMatchMode::EXACT => interfaces()
             .into_iter()
             .filter(|iface| iface.name == name)
-            .next()
+            .next(),
     }
 }
 
